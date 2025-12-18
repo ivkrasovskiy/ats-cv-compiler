@@ -50,4 +50,5 @@ class NoopProvider:
         items: Sequence[BulletRewriteRequest],
         instructions: str | None,
     ) -> Sequence[BulletRewriteResult]:
-        raise NotImplementedError
+        _ = instructions
+        return [BulletRewriteResult(item_id=item.item_id, bullets=item.bullets) for item in items]
