@@ -191,6 +191,15 @@ cython_debug/
 # Ruff stuff:
 .ruff_cache/
 
+# uv cache (kept inside repo for sandboxed runs)
+.uv-cache/
+
+# Build outputs
+out/
+!out/.gitkeep
+examples/**/out/
+!examples/**/out/.gitkeep
+
 # PyPI configuration file
 .pypirc
 
