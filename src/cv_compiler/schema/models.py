@@ -1,3 +1,10 @@
+"""
+Dataclasses representing validated CV entities.
+
+These types represent the canonical, renderable facts used by the compiler. Anything that appears
+in output should be attributable to fields on these models (no fabrication).
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

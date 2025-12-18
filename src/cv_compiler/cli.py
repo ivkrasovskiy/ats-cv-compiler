@@ -1,3 +1,10 @@
+"""
+CLI argument parsing and command dispatch.
+
+This module owns the user-facing `cv` command, including flags like `--example` and `--job`.
+The heavy lifting is delegated to the pipeline layer.
+"""
+
 from __future__ import annotations
 
 import argparse

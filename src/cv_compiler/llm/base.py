@@ -1,3 +1,10 @@
+"""
+Optional LLM provider protocol and request types.
+
+Defines a minimal interface for constrained bullet rewriting. Implementations must not invent facts
+and must keep rewrites attributable to the input items.
+"""
+
 from __future__ import annotations
 
 from collections.abc import Sequence

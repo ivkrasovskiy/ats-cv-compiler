@@ -1,3 +1,10 @@
+"""
+Tests for CLI argument parsing.
+
+These checks lock down flag behavior and basic parsing constraints without depending on the
+pipeline implementation.
+"""
+
 from __future__ import annotations
 
 import unittest

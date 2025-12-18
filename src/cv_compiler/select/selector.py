@@ -1,3 +1,10 @@
+"""
+Deterministic selection interface.
+
+Given canonical data and an optional job spec, produces a stable selection result and traceable
+decision records. Implementation is currently stubbed.
+"""
+
 from __future__ import annotations
 
 from cv_compiler.schema.models import CanonicalData, JobSpec

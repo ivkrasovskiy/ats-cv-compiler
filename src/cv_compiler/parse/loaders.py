@@ -1,3 +1,10 @@
+"""
+Load canonical data and job specs from disk.
+
+This module is responsible for turning repository files into validated in-memory models for the
+pipeline. Functions are currently stubs (interfaces only).
+"""
+
 from __future__ import annotations
 
 from pathlib import Path

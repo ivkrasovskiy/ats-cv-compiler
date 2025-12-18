@@ -1,3 +1,9 @@
+"""
+Selection result and decision types.
+
+These structures carry both the chosen IDs and the reasoning metadata used for explanation/debug.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

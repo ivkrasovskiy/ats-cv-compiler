@@ -1,3 +1,9 @@
+"""
+Rendering request/response types.
+
+These types describe what content to render, which templates to use, and where to write outputs.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

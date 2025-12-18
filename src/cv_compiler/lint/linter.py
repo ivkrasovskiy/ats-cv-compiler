@@ -1,3 +1,10 @@
+"""
+Lint interfaces for inputs and outputs.
+
+Provides hooks to validate canonical data and to check rendered artifacts against ATS constraints.
+Implementation is currently stubbed.
+"""
+
 from __future__ import annotations
 
 from collections.abc import Sequence

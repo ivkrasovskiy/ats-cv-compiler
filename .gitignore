@@ -200,6 +200,9 @@ out/
 examples/**/out/
 !examples/**/out/.gitkeep
 
+# Temporary working artifacts
+tmp/
+
 # PyPI configuration file
 .pypirc
 

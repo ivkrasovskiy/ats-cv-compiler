@@ -1,3 +1,9 @@
+"""
+Signature-level tests for the scaffolded public API.
+
+These tests ensure the codebase keeps stable entrypoints/types while implementations are filled in.
+"""
+
 from __future__ import annotations
 
 import dataclasses

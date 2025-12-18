@@ -1,3 +1,9 @@
+"""
+Shared enums and lint issue types.
+
+These types are used across the pipeline to represent validation/lint findings in a uniform way.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

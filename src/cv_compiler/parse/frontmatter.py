@@ -1,3 +1,10 @@
+"""
+Frontmatter parsing for Markdown sources.
+
+Parses Markdown files that include optional YAML frontmatter. Loaders use this to build validated
+models from user-editable content.
+"""
+
 from __future__ import annotations
 
 from collections.abc import Mapping

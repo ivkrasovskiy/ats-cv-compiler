@@ -1,3 +1,10 @@
+"""
+Build pipeline request/response types and entrypoint.
+
+The intended flow is: parse → validate → select → (optional rewrite) → render → lint.
+Default behavior must remain deterministic; the pipeline implementation is currently scaffolded.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

@@ -67,3 +67,17 @@ A change is done when:
 - `cv lint` passes
 - output remains ATS-safe
 - the change is documented where appropriate
+
+## Repo Navigation Workflow (Index + Tasks)
+
+For non-trivial debugging/refactors, prefer this deterministic workflow:
+
+1. Regenerate the project index (updates missing module docstrings and refreshes local import graph):
+   - `uv run python scripts/project_index.py`
+   - Output: `docs/PROJECT_INDEX.md`
+2. Generate a temporary per-file task checklist (useful for breaking down work and tracking progress):
+   - `uv run python scripts/task_index.py --goal "..." `
+   - Output: `tmp/task_index.md` (git-ignored)
+3. Execute tasks top-to-bottom, updating `tmp/task_index.md` as you go.
+4. When done, clear the task index:
+   - `uv run python scripts/task_index.py --clear`
