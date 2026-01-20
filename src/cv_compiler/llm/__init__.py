@@ -7,7 +7,8 @@ truth. Providers must follow strict non-fabrication constraints.
 
 from __future__ import annotations
 
-from .base import LLMProvider, NoopProvider
+from .base import ExperienceDraft, LLMProvider, NoopProvider
 from .config import LLMConfig
+from .openai import OpenAIProvider
 
-__all__ = ["LLMConfig", "LLMProvider", "NoopProvider"]
+__all__ = ["ExperienceDraft", "LLMConfig", "LLMProvider", "NoopProvider", "OpenAIProvider"]

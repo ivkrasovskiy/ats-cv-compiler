@@ -1,0 +1,60 @@
+- id: exp_01
+  template: "Built {system_or_feature} for {audience}, improving {metric_name} by {metric_value}{metric_unit} ({measurement_window})."
+- id: exp_02
+  template: "Delivered {project_outcome} that reduced {cost_or_time} by {metric_value}{metric_unit}, validated via {evidence_source}."
+- id: exp_03
+  template: "Implemented {tech_or_architecture} to scale {workload}, increasing throughput to {metric_value}{metric_unit}."
+- id: exp_04
+  template: "Automated {process}, cutting manual effort by {metric_value}{metric_unit} for {team_or_function}."
+- id: exp_05
+  template: "Led {initiative} across {stakeholders}, resulting in {business_result} ({metric_value}{metric_unit})."
+- id: exp_06
+  template: "Optimized {component} to reduce latency by {metric_value}{metric_unit} under {load_condition}."
+- id: exp_07
+  template: "Reduced failure rate of {system} from {baseline_metric} to {metric_value}{metric_unit} by {method}."
+- id: exp_08
+  template: "Introduced {testing_or_quality_practice}, preventing {issue_type} and lowering defects by {metric_value}{metric_unit}."
+- id: exp_09
+  template: "Refactored {legacy_area} into {new_structure}, improving maintainability measured by {proxy_metric}."
+- id: exp_10
+  template: "Shipped {feature} that increased {metric_name} by {metric_value}{metric_unit} for {user_segment}."
+- id: exp_11
+  template: "Consolidated {tools_or_services} into {platform}, reducing operational overhead by {metric_value}{metric_unit}."
+- id: exp_12
+  template: "Designed {data_pipeline} to process {volume} {unit} with {sla_or_latency}."
+- id: exp_13
+  template: "Built {integration} connecting {system_a} and {system_b}, enabling {business_capability}."
+- id: exp_14
+  template: "Implemented {security_or_compliance} controls, achieving {compliance_result} in {timeframe}."
+- id: exp_15
+  template: "Migrated {workload} to {platform}, lowering cost by {metric_value}{metric_unit}."
+- id: exp_16
+  template: "Improved {metric_name} for {product_area} using {method}, confirmed by {measurement_method}."
+- id: exp_17
+  template: "Owned {service} uptime, meeting {availability_target} and reducing incidents by {metric_value}{metric_unit}."
+- id: exp_18
+  template: "Created {tooling} that accelerated {workflow} by {metric_value}{metric_unit} for {team}."
+- id: exp_19
+  template: "Developed {feature_set} for {customer_type}, contributing to {revenue_or_growth_metric}."
+- id: exp_20
+  template: "Implemented {observability_stack} to surface {issue_type}, cutting time-to-detect by {metric_value}{metric_unit}."
+- id: exp_21
+  template: "Reduced {resource} usage by {metric_value}{metric_unit} by introducing {optimization}."
+- id: exp_22
+  template: "Launched {internal_platform} used by {user_count} users, improving {proxy_metric}."
+- id: exp_23
+  template: "Standardized {process_or_guideline}, decreasing onboarding time by {metric_value}{metric_unit}."
+- id: exp_24
+  template: "Implemented {feature} with {constraint} to deliver {outcome} for {audience}."
+- id: exp_25
+  template: "Built {reporting_or_dashboard} that enabled {decision_type}, evidenced by {evidence_source}."
+- id: exp_26
+  template: "Reduced {bottleneck} by {metric_value}{metric_unit} via {architecture_or_algorithm}."
+- id: exp_27
+  template: "Delivered {project_scope} within {timeframe}, meeting {quality_or_sla_target}."
+- id: exp_28
+  template: "Improved {developer_experience} by {metric_value}{metric_unit} through {tooling_or_process}."
+- id: exp_29
+  template: "Streamlined {deployment_or_release} to achieve {cadence_or_lead_time}."
+- id: exp_30
+  template: "Implemented {data_quality_or_validation} to reduce {error_type} by {metric_value}{metric_unit}."

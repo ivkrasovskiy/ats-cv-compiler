@@ -7,6 +7,7 @@ pipeline. Functions are currently stubs (interfaces only).
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
@@ -24,6 +25,11 @@ from cv_compiler.schema.models import (
     Skills,
     SkillsCategory,
 )
+
+_LLM_EXPERIENCE_PREFIX = "llm_"
+_USER_EXPERIENCE_PREFIX = "user_"
+_ACTIVE_USER_RE = re.compile(r"^user_[a-z0-9_]+$")
+_ACTIVE_LLM_RE = re.compile(r"^llm_[a-z0-9_]+$")
 
 
 def _require_mapping(
@@ -148,9 +154,23 @@ def _load_project_entry(path: Path) -> ProjectEntry:
     fm = doc.frontmatter
     entry_id = _require_str(fm, "id", source=path)
     name = _require_str(fm, "name", source=path)
+    company = _optional_str_or_none(fm, "company")
+    role = _optional_str_or_none(fm, "role")
+    start_date = _optional_str_or_none(fm, "start_date")
+    end_date = _optional_str_or_none(fm, "end_date")
     tags = _require_list_of_str(fm, "tags", source=path)
     bullets = _require_list_of_str(fm, "bullets", source=path)
-    return ProjectEntry(id=entry_id, name=name, tags=tags, bullets=bullets, source_path=path)
+    return ProjectEntry(
+        id=entry_id,
+        name=name,
+        company=company,
+        role=role,
+        start_date=start_date,
+        end_date=end_date,
+        tags=tags,
+        bullets=bullets,
+        source_path=path,
+    )
 
 
 def _load_skills(path: Path) -> Skills:
@@ -207,7 +227,7 @@ def load_canonical_data(data_dir: Path) -> CanonicalData:
     experience_dir = data_dir / "experience"
     experience: list[ExperienceEntry] = []
     if experience_dir.exists():
-        for path in sorted(experience_dir.glob("*.md")):
+        for path in _select_experience_files(experience_dir):
             experience.append(_load_experience_entry(path))
 
     projects_dir = data_dir / "projects"
@@ -227,6 +247,28 @@ def load_canonical_data(data_dir: Path) -> CanonicalData:
         skills=skills,
         education=education,
     )
+
+
+def _select_experience_files(experience_dir: Path) -> list[Path]:
+    candidates = list(experience_dir.glob("*.md"))
+    best: dict[str, tuple[int, Path]] = {}
+    for path in candidates:
+        stem = path.stem
+        base, priority = _experience_base_and_priority(stem)
+        if priority <= 0:
+            continue
+        existing = best.get(base)
+        if existing is None or priority > existing[0]:
+            best[base] = (priority, path)
+    return [best[k][1] for k in sorted(best.keys())]
+
+
+def _experience_base_and_priority(stem: str) -> tuple[str, int]:
+    if _ACTIVE_USER_RE.match(stem):
+        return stem[len(_USER_EXPERIENCE_PREFIX) :], 2
+    if _ACTIVE_LLM_RE.match(stem):
+        return stem[len(_LLM_EXPERIENCE_PREFIX) :], 1
+    return "", 0
 
 
 def load_job_spec(path: Path) -> JobSpec:

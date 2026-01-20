@@ -11,6 +11,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Protocol
 
+from cv_compiler.schema.models import JobSpec, ProjectEntry
+
 
 @dataclass(frozen=True, slots=True)
 class BulletRewriteRequest:
@@ -23,6 +25,14 @@ class BulletRewriteRequest:
 class BulletRewriteResult:
     item_id: str
     bullets: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class ExperienceDraft:
+    id: str
+    role: str | None
+    bullets: tuple[str, ...]
+    source_project_ids: tuple[str, ...]
 
 
 class LLMProvider(Protocol):
@@ -40,6 +50,12 @@ class LLMProvider(Protocol):
         instructions: str | None,
     ) -> Sequence[BulletRewriteResult]: ...
 
+    def generate_experience(
+        self,
+        projects: Sequence[ProjectEntry],
+        job: JobSpec | None,
+    ) -> Sequence[ExperienceDraft]: ...
+
 
 @dataclass(frozen=True, slots=True)
 class NoopProvider:
@@ -52,3 +68,11 @@ class NoopProvider:
     ) -> Sequence[BulletRewriteResult]:
         _ = instructions
         return [BulletRewriteResult(item_id=item.item_id, bullets=item.bullets) for item in items]
+
+    def generate_experience(
+        self,
+        projects: Sequence[ProjectEntry],
+        job: JobSpec | None,
+    ) -> Sequence[ExperienceDraft]:
+        _ = (projects, job)
+        return []

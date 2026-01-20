@@ -90,6 +90,7 @@ LLM is optional and constrained:
   - rewrite bullets for clarity/compactness
   - reduce redundancy
   - map content to template slots
+  - derive experience bullets from project data (no new facts)
 - Disallowed:
   - adding new facts, numbers, employers, titles, dates
   - “guessing” metrics

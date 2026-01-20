@@ -46,6 +46,10 @@ class ExperienceEntry:
 class ProjectEntry:
     id: str
     name: str
+    company: str | None
+    role: str | None
+    start_date: str | None
+    end_date: str | None
     tags: tuple[str, ...]
     bullets: tuple[str, ...]
     source_path: Path | None = None

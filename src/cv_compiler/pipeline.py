@@ -13,6 +13,7 @@ from pathlib import Path
 
 from cv_compiler.lint.linter import lint_build_inputs, lint_rendered_output
 from cv_compiler.llm.base import BulletRewriteRequest, LLMProvider
+from cv_compiler.llm.experience import archive_user_experience_files, write_experience_artifacts
 from cv_compiler.parse.loaders import load_canonical_data, load_job_spec
 from cv_compiler.render.renderer import render_cv
 from cv_compiler.render.types import RenderFormat, RenderRequest
@@ -30,6 +31,7 @@ class BuildRequest:
     format: RenderFormat = RenderFormat.PDF
     llm: LLMProvider | None = None
     llm_instructions_path: Path | None = None
+    experience_regenerate: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,6 +73,30 @@ def build_cv(request: BuildRequest) -> BuildResult:
     issues: list[LintIssue] = list(lint_build_inputs(data))
 
     job = load_job_spec(request.job_path) if request.job_path else None
+
+    if request.llm is not None:
+        try:
+            if request.experience_regenerate:
+                archive_user_experience_files(request.data_dir)
+            drafts = request.llm.generate_experience(data.projects, job)
+            if drafts:
+                write_experience_artifacts(
+                    request.data_dir,
+                    projects=tuple(data.projects),
+                    drafts=tuple(drafts),
+                )
+                data = load_canonical_data(request.data_dir)
+                issues = list(lint_build_inputs(data))
+        except Exception as exc:  # noqa: BLE001
+            issues.append(
+                LintIssue(
+                    code="LLM_GENERATION_FAILED",
+                    message=str(exc),
+                    severity=Severity.WARNING,
+                    source_path=None,
+                )
+            )
+
     selection = select_content(data, job)
 
     if any(issue.severity == Severity.ERROR for issue in issues):

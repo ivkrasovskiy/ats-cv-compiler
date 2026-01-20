@@ -14,7 +14,7 @@ from pathlib import Path
 
 from cv_compiler.explain import format_selection_explanation
 from cv_compiler.lint.linter import lint_build_inputs
-from cv_compiler.llm.base import NoopProvider
+from cv_compiler.llm import LLMConfig, NoopProvider, OpenAIProvider
 from cv_compiler.parse.loaders import load_canonical_data, load_job_spec
 from cv_compiler.pipeline import BuildRequest, build_cv
 from cv_compiler.render.types import RenderFormat
@@ -46,7 +46,15 @@ def _build_parser() -> argparse.ArgumentParser:
         "--llm",
         type=str,
         default=None,
-        help="Optional LLM provider name. Deterministic build does not require this.",
+        help=(
+            "Optional LLM provider name (e.g. openai, noop). "
+            "Deterministic build does not require this."
+        ),
+    )
+    build.add_argument(
+        "--experience-regenerate",
+        action="store_true",
+        help="Archive user experience overrides before regenerating with LLM.",
     )
 
     lint = sub.add_parser("lint", help="Validate schema and enforce ATS constraints.")
@@ -97,9 +105,19 @@ def main(argv: Sequence[str] | None = None) -> int:
             if args.llm:
                 if args.llm == "noop":
                     llm = NoopProvider()
+                elif args.llm == "openai":
+                    config = LLMConfig.from_env()
+                    if config is None:
+                        print(
+                            "Missing LLM config. Set CV_LLM_BASE_URL and CV_LLM_MODEL "
+                            "(optional CV_LLM_API_KEY).",
+                            file=sys.stderr,
+                        )
+                        return 2
+                    llm = OpenAIProvider(config)
                 else:
                     print(
-                        f"Unknown/unsupported LLM provider: {args.llm!r} (supported: noop)",
+                        f"Unknown/unsupported LLM provider: {args.llm!r} (supported: openai, noop)",
                         file=sys.stderr,
                     )
                     return 2
@@ -114,6 +132,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                         format=RenderFormat.PDF,
                         llm=llm,
                         llm_instructions_path=None,
+                        experience_regenerate=args.experience_regenerate,
                     )
                 )
             except NotImplementedError as e:

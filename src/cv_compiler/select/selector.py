@@ -58,16 +58,16 @@ def select_content(data: CanonicalData, job: JobSpec | None) -> SelectionResult:
         exp_ids = tuple(
             e.id for e in sorted(experiences, key=lambda e: (-_recency_score(e.start_date), e.id))
         )
-        proj_ids = tuple(p.id for p in sorted(projects, key=lambda p: p.id))
+        all_project_ids = tuple(p.id for p in sorted(projects, key=lambda p: p.id))
         decisions = tuple(
             SelectionDecision(
                 item_id=item_id, score=0.0, matched_keywords=(), reasons=("generic build",)
             )
-            for item_id in (*exp_ids, *proj_ids)
+            for item_id in (*exp_ids, *all_project_ids)
         )
         return SelectionResult(
             selected_experience_ids=exp_ids,
-            selected_project_ids=proj_ids,
+            selected_project_ids=(),
             decisions=decisions,
         )
 
@@ -104,9 +104,7 @@ def select_content(data: CanonicalData, job: JobSpec | None) -> SelectionResult:
     selected_experience_ids = tuple(t[2] for t in exp_scored[:3] if t[0] > 0) or tuple(
         t[2] for t in exp_scored[:1]
     )
-    selected_project_ids = tuple(t[1] for t in proj_scored[:2] if t[0] > 0) or tuple(
-        t[1] for t in proj_scored[:1]
-    )
+    selected_project_ids: tuple[str, ...] = ()
 
     for score, _, item_id, matched, reasons in exp_scored:
         decisions.append(

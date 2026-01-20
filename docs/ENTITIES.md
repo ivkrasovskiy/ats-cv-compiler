@@ -7,7 +7,7 @@ This document describes the public-ish entities we expect in the MVP, focusing o
 - `Link(label: str, url: str)`
 - `Profile(id: str, name: str, headline: str, location: str, email: str | None, links: tuple[Link, ...], summary: tuple[str, ...], source_path: Path | None = None)`
 - `ExperienceEntry(id: str, company: str, title: str, location: str | None, start_date: str, end_date: str | None, tags: tuple[str, ...], bullets: tuple[str, ...], source_path: Path | None = None)`
-- `ProjectEntry(id: str, name: str, tags: tuple[str, ...], bullets: tuple[str, ...], source_path: Path | None = None)`
+- `ProjectEntry(id: str, name: str, company: str | None, role: str | None, start_date: str | None, end_date: str | None, tags: tuple[str, ...], bullets: tuple[str, ...], source_path: Path | None = None)`
 - `SkillsCategory(name: str, items: tuple[str, ...])`
 - `Skills(id: str, categories: tuple[SkillsCategory, ...], source_path: Path | None = None)`
 - `EducationEntry(institution: str, degree: str, location: str | None, start_date: str | None, end_date: str | None)`
@@ -37,8 +37,13 @@ Notes:
 - `LLMProvider` protocol (`src/cv_compiler/llm/base.py`)
   - `name: str`
   - `rewrite_bullets(items: Sequence[BulletRewriteRequest], instructions: str | None) -> Sequence[BulletRewriteResult]`
+  - `generate_experience(projects: Sequence[ProjectEntry], job: JobSpec | None) -> Sequence[ExperienceDraft]`
 - `BulletRewriteRequest(item_id: str, bullets: tuple[str, ...], job_keywords: tuple[str, ...])`
 - `BulletRewriteResult(item_id: str, bullets: tuple[str, ...])`
+- `ExperienceDraft(id: str, role: str | None, bullets: tuple[str, ...], source_project_ids: tuple[str, ...])`
+- `LLMConfig(base_url: str, model: str, api_key: str | None = None, timeout_seconds: int = 300)` (`src/cv_compiler/llm/config.py`)
+  - `from_env(prefix: str = "CV_LLM_", env_path: Path | None = Path("config/llm.env")) -> LLMConfig | None`
+- `OpenAIProvider(config: LLMConfig, prompt_path: Path, templates_path: Path)` (`src/cv_compiler/llm/openai.py`)
 
 ## Rendering (`src/cv_compiler/render/*`)
 
@@ -58,11 +63,10 @@ Notes:
 
 ## Pipeline (`src/cv_compiler/pipeline.py`)
 
-- `BuildRequest(data_dir: Path, job_path: Path | None, template_dir: Path, out_dir: Path, format: RenderFormat = RenderFormat.PDF, llm: LLMProvider | None = None, llm_instructions_path: Path | None = None)`
+- `BuildRequest(data_dir: Path, job_path: Path | None, template_dir: Path, out_dir: Path, format: RenderFormat = RenderFormat.PDF, llm: LLMProvider | None = None, llm_instructions_path: Path | None = None, experience_regenerate: bool = False)`
 - `BuildResult(output_path: Path, issues: tuple[LintIssue, ...])`
 - `build_cv(request: BuildRequest) -> BuildResult`
 
 ## Explain (`src/cv_compiler/explain.py`)
 
 - `format_selection_explanation(selection: SelectionResult) -> str`
-

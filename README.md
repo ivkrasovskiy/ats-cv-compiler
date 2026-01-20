@@ -30,13 +30,40 @@ Optional:
 
 The default build is deterministic and does not require any LLM.
 
-When enabled later, the LLM will be used only for constrained rewriting/condensing of already-selected
-bullets (never as a source of truth).
+When enabled, the LLM is used only for constrained derivation of experience bullets from projects
+(never as a source of truth).
 
 Planned configuration (via environment variables):
 - `CV_LLM_BASE_URL`: an OpenAI-compatible HTTP endpoint (e.g. a local server)
 - `CV_LLM_MODEL`: model name/id served by that endpoint
 - `CV_LLM_API_KEY`: optional (depends on your endpoint)
+- `CV_LLM_TIMEOUT_SECONDS`: request timeout (default: 300)
+
+Usage:
+- `uv run cv build --example basic --llm openai`
+
+Optional config file:
+- Create `config/llm.env` with the same variables:
+  - `CV_LLM_BASE_URL=http://127.0.0.1:1234`
+  - `CV_LLM_MODEL=lmstudio-community/qwen3-8b-mlx`
+  - `CV_LLM_TIMEOUT_SECONDS=300`
+
+Generated artifacts:
+- LLM outputs are written to `data/experience/llm_<id>.md` (or `examples/.../data/experience/` for examples).
+- If a user creates `data/experience/user_<id>.md`, it will be used instead and never overwritten.
+  - IDs are deterministic: `exp_<company>_<start>` (derived from project data).
+
+Regenerate experience overrides:
+- `uv run cv build --llm openai --experience-regenerate`
+- This renames active user overrides to `user_<id>.<unix_ts>.md` and re-runs LLM generation.
+
+Project requirements for LLM:
+- Projects should include `company`, `role`, `start_date`, and optional `end_date` in frontmatter.
+- LLM bullets must use only facts and metrics explicitly present in project data.
+
+Prompt and templates:
+- `prompts/experience_prompt.md`
+- `prompts/experience_templates.yaml`
 
 Model sizing guidance (rule of thumb):
 - Bullet rewriting is a relatively small task; a small instruct model is usually sufficient.

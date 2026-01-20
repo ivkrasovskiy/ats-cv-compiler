@@ -203,6 +203,9 @@ examples/**/out/
 # Temporary working artifacts
 tmp/
 
+# Local LLM config
+config/llm.env
+
 # PyPI configuration file
 .pypirc
 

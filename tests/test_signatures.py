@@ -12,7 +12,7 @@ import unittest
 
 from cv_compiler.explain import format_selection_explanation
 from cv_compiler.lint.linter import lint_build_inputs, lint_rendered_output
-from cv_compiler.llm.base import LLMProvider
+from cv_compiler.llm.base import ExperienceDraft, LLMProvider
 from cv_compiler.parse.frontmatter import parse_markdown_frontmatter
 from cv_compiler.parse.loaders import load_canonical_data, load_job_spec
 from cv_compiler.pipeline import BuildRequest, BuildResult, build_cv
@@ -36,6 +36,7 @@ class TestSignatures(unittest.TestCase):
             Profile,
             CanonicalData,
             JobSpec,
+            ExperienceDraft,
             SelectionDecision,
             SelectionResult,
             RenderRequest,
@@ -72,3 +73,4 @@ class TestSignatures(unittest.TestCase):
 
     def test_llm_provider_protocol_shape(self) -> None:
         self.assertTrue(hasattr(LLMProvider, "rewrite_bullets"))
+        self.assertTrue(hasattr(LLMProvider, "generate_experience"))
