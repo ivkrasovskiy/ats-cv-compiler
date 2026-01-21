@@ -256,7 +256,7 @@ def restore_llm_experience_files(backup_dir: Path, data_dir: Path) -> None:
 def _collect_allowed_numbers(projects: tuple[ProjectEntry, ...]) -> set[str]:
     tokens: set[str] = set()
     for p in projects:
-        text_values: list[str] = [p.name, *p.bullets]
+        text_values: list[str] = [p.name, p.start_date, p.end_date, *p.bullets]
         if p.company:
             text_values.append(p.company)
         if p.role:
