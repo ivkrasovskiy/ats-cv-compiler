@@ -223,7 +223,17 @@ def archive_user_experience_files(data_dir: Path) -> tuple[Path, ...]:
 def _collect_allowed_numbers(projects: tuple[ProjectEntry, ...]) -> set[str]:
     tokens: set[str] = set()
     for p in projects:
-        for text in (p.name, *p.bullets):
+        text_values: list[str] = [p.name, *p.bullets]
+        if p.company:
+            text_values.append(p.company)
+        if p.role:
+            text_values.append(p.role)
+        if p.start_date:
+            text_values.append(p.start_date)
+        if p.end_date:
+            text_values.append(p.end_date)
+        text_values.extend(p.tags)
+        for text in text_values:
             tokens.update(_NUM_TOKEN_RE.findall(text))
     return tokens
 

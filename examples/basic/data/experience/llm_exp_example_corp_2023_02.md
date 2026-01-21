@@ -11,10 +11,9 @@ tags:
 - pdf
 - python
 bullets:
-- Built CLI pipeline to compile structured CV data into ATS-safe PDFs, cutting manual
-  edits by 40%.
-- Added explainable selection signals based on keyword overlap, reducing review time
-  by 30%.
+- Built CLI pipeline for ATS-safe PDF CV compilation, reducing manual edits by 40%
+  (2023-02).
+- Added keyword-based selection signals, decreasing review time by 30% (2023-02).
 source_project_ids:
 - proj_cv_compiler
 ---
