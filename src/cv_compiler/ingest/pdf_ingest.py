@@ -16,7 +16,6 @@ from urllib.request import Request, urlopen
 import yaml
 
 from cv_compiler.llm.config import LLMConfig
-from cv_compiler.llm.experience import USER_PREFIX
 from cv_compiler.llm.openai import build_chat_endpoint, build_chat_payload, extract_chat_content
 
 _SAFE_ID_RE = re.compile(r"[^a-z0-9_]+")
@@ -249,31 +248,28 @@ def write_ingest_files(data_dir: Path, parsed: ParsedCv, *, overwrite: bool) -> 
     _write_frontmatter(education_path, education_frontmatter, note="Generated from PDF.")
     written.append(education_path)
 
-    experience_dir = data_dir / "experience"
-    experience_dir.mkdir(parents=True, exist_ok=True)
+    derived_projects: list[ParsedProject] = []
     for idx, entry in enumerate(parsed.experience, start=1):
-        exp_id = _unique_id(
-            _slugify(f"exp_{entry.company or 'unknown'}_{entry.start_date or idx}"), used_ids
+        name_parts = [entry.company or "", entry.title or ""]
+        name = " - ".join(part for part in name_parts if part.strip())
+        if not name:
+            name = f"Project {idx}"
+        derived_projects.append(
+            ParsedProject(
+                name=name,
+                company=entry.company,
+                role=entry.title,
+                start_date=entry.start_date,
+                end_date=entry.end_date,
+                bullets=entry.bullets,
+                tags=entry.tags,
+            )
         )
-        used_ids.add(exp_id)
-        exp_path = experience_dir / f"{USER_PREFIX}{exp_id}.md"
-        _ensure_writable(exp_path, overwrite=overwrite)
-        exp_frontmatter = {
-            "id": exp_id,
-            "company": _require_field(entry.company, "experience.company", warnings),
-            "title": _require_field(entry.title, "experience.title", warnings),
-            "location": entry.location,
-            "start_date": _require_field(entry.start_date, "experience.start_date", warnings),
-            "end_date": entry.end_date,
-            "tags": list(entry.tags),
-            "bullets": list(entry.bullets),
-        }
-        _write_frontmatter(exp_path, exp_frontmatter, note="Generated from PDF.")
-        written.append(exp_path)
 
     projects_dir = data_dir / "projects"
     projects_dir.mkdir(parents=True, exist_ok=True)
-    for idx, entry in enumerate(parsed.projects, start=1):
+    project_entries = list(parsed.projects) + derived_projects
+    for idx, entry in enumerate(project_entries, start=1):
         proj_id = _unique_id(_slugify(f"proj_{entry.name or idx}"), used_ids)
         used_ids.add(proj_id)
         proj_path = projects_dir / f"{proj_id}.md"

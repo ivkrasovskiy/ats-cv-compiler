@@ -6,6 +6,7 @@ Produces a deterministic, ATS-safe Markdown representation used as the source fo
 
 from __future__ import annotations
 
+import re
 import unicodedata
 
 from cv_compiler.schema.models import CanonicalData
@@ -28,12 +29,41 @@ _TRANSLATE_MAP = str.maketrans(
     }
 )
 
+_NUM_TOKEN_RE = re.compile(
+    r"\d+(?:[.,]\d+)?(?:%|[kKmMbB])?(?:\+)?(?:-\d+(?:[.,]\d+)?(?:%|[kKmMbB])?)?"
+)
+_VERB_KEYWORDS = (
+    "led",
+    "mentored",
+    "oversaw",
+    "built",
+    "designed",
+    "implemented",
+    "improved",
+    "increased",
+    "reduced",
+    "delivered",
+    "shipped",
+    "developed",
+    "optimized",
+    "automated",
+    "collaborated",
+    "launched",
+    "owned",
+    "drove",
+    "scaled",
+    "trained",
+    "deployed",
+)
+
 
 def normalize_markdown_text(text: str) -> str:
     """Normalize Unicode punctuation to ASCII for ATS-safe rendering."""
     replaced = text.translate(_TRANSLATE_MAP)
     normalized = unicodedata.normalize("NFKD", replaced)
-    return normalized.encode("ascii", "ignore").decode("ascii")
+    ascii_text = normalized.encode("ascii", "ignore").decode("ascii")
+    ascii_text = _fix_spacing(ascii_text)
+    return re.sub(r"[ \t]{2,}", " ", ascii_text)
 
 
 def build_markdown(
@@ -52,7 +82,10 @@ def build_markdown(
             lines.append("")
 
     def add_section(title: str) -> None:
-        add_blank()
+        if lines:
+            add_blank()
+            add_line("---")
+            add_blank()
         add_line(f"## {title}")
 
     add_line(f"# {data.profile.name}")
@@ -80,7 +113,7 @@ def build_markdown(
             location = f" ({entry.location})" if entry.location else ""
             add_line(f"### {entry.title} - {entry.company}{location} | {entry.start_date} - {end}")
             for bullet in entry.bullets:
-                add_line(f"- {bullet}")
+                add_line(f"- {_emphasize_experience_bullet(bullet)}")
             add_blank()
 
     selected_proj = set(selection.selected_project_ids)
@@ -122,3 +155,49 @@ def build_markdown(
     while lines and lines[-1] == "":
         lines.pop()
     return "\n".join(lines) + "\n"
+
+
+def _emphasize_experience_bullet(text: str) -> str:
+    if "**" in text:
+        return text
+    if _NUM_TOKEN_RE.search(text):
+        return _bold_numeric_tokens(text)
+    return _bold_first_keyword(text)
+
+
+def _first_clause_end(text: str) -> int:
+    for token in [",", ";", " - ", " — ", ". "]:
+        idx = text.find(token)
+        if idx > 0:
+            return idx
+    words = text.split()
+    if len(words) <= 6:
+        return len(text)
+    snippet = " ".join(words[:6])
+    return len(snippet)
+
+
+def _bold_numeric_tokens(text: str) -> str:
+    parts: list[str] = []
+    last = 0
+    for match in _NUM_TOKEN_RE.finditer(text):
+        start, end = match.span()
+        parts.append(text[last:start])
+        parts.append(f"**{match.group(0)}**")
+        last = end
+    parts.append(text[last:])
+    return "".join(parts)
+
+
+def _bold_first_keyword(text: str) -> str:
+    for verb in _VERB_KEYWORDS:
+        pattern = re.compile(rf"\b{re.escape(verb)}\b", re.IGNORECASE)
+        match = pattern.search(text)
+        if match:
+            start, end = match.span()
+            return f"{text[:start]}**{text[start:end]}**{text[end:]}"
+    return text
+
+
+def _fix_spacing(text: str) -> str:
+    return re.sub(r"([A-Za-z])(\d)", r"\\1 \\2", text)

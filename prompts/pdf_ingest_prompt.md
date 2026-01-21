@@ -6,6 +6,7 @@ Rules:
 - If a field is missing or unclear, output an empty string or empty list.
 - Keep bullet wording close to the source text.
 - Output JSON only. No extra commentary.
+- Place each role/experience entry into the projects list; leave experience as an empty list.
 
 PDF_TEXT:
 {{PDF_TEXT}}

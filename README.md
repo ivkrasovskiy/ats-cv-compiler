@@ -49,6 +49,8 @@ The default build is deterministic and does not require any LLM.
 When enabled, the LLM is used only for constrained derivation of experience bullets from projects
 (never as a source of truth).
 It can also highlight a few key skills from your existing skills list.
+Experience bullets are emphasized with a single bold phrase (covers metrics or leading clause).
+Numeric figures in experience bullets are highlighted; if no figures are present, a key verb is bolded.
 
 Planned configuration (via environment variables):
 - `CV_LLM_MODE`: `api` (endpoint) or `offline` (manual copy/paste)
@@ -87,7 +89,7 @@ Manual/offline LLM mode:
 Manual/offline PDF ingestion:
 - `cv to_mds_from_pdf` writes `data/llm_ingest_request.json` and expects
   `data/llm_ingest_response.json` when `CV_LLM_MODE=offline`.
-- Ingested experiences are written as `data/experience/user_<id>.md`.
+- Ingested experience data is mapped into `data/projects/*.md` (no experience files are created).
 
 Project requirements for LLM:
 - Projects should include `company`, `role`, `start_date`, and optional `end_date` in frontmatter.

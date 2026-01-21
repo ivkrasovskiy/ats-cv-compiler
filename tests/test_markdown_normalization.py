@@ -59,5 +59,44 @@ class TestMarkdownNormalization(unittest.TestCase):
         markdown = build_markdown(data, selection)
         self.assertIn("Jose O'Neil", markdown)
         self.assertIn("Builds systems-reliably.", markdown)
-        self.assertIn("Improved uptime-stability.", markdown)
+        self.assertIn("**Improved** uptime-stability.", markdown)
         self.assertTrue(all(ord(ch) < 128 for ch in markdown))
+
+    def test_experience_bullet_emphasis(self) -> None:
+        profile = Profile(
+            id="profile",
+            name="Test User",
+            headline="Engineer",
+            location="Remote",
+            email=None,
+            links=(),
+            about_me="Builds systems.",
+        )
+        experience = ExperienceEntry(
+            id="exp_1",
+            company="Acme",
+            title="Dev",
+            location=None,
+            start_date="2022-01",
+            end_date=None,
+            tags=(),
+            bullets=("Increased coverage by 3-5% through new tests.",),
+        )
+        skills = Skills(id="skills", categories=(SkillsCategory(name="Tools", items=("Git",)),))
+        data = CanonicalData(
+            profile=profile,
+            experience=(experience,),
+            projects=(),
+            skills=skills,
+            education=Education(id="education", entries=()),
+        )
+        selection = SelectionResult(
+            selected_experience_ids=("exp_1",),
+            selected_project_ids=(),
+            decisions=(
+                SelectionDecision(item_id="exp_1", score=1.0, matched_keywords=(), reasons=()),
+            ),
+        )
+
+        markdown = build_markdown(data, selection)
+        self.assertIn("Increased coverage by **3-5%** through new tests.", markdown)

@@ -77,7 +77,7 @@ Deterministic index of files + local import connections (includes tests).
 - Module: `cv_compiler.ingest.pdf_ingest`
 - Doc: PDF ingestion helpers for bootstrapping canonical Markdown files.
 - Defines: `IngestResult`, `ParsedCv`, `ParsedEducation`, `ParsedExperience`, `ParsedLink`, `ParsedProfile`, `ParsedProject`, `ParsedSkillCategory`, `_build_ingest_prompt`, `_coerce_str`, `_coerce_str_list`, `_ensure_writable`, `_ingest_schema`, `_manual_llm_content`, `_parse_education`, `_parse_experience`, `_parse_links`, `_parse_projects`, `_parse_skills`, `_request_llm_content`, `_require_field`, `_slugify`, `_unique_id`, `_write_frontmatter`, `extract_pdf_text`, `ingest_pdf_to_markdown`, `parse_ingest_payload`, `parse_ingest_response`, `write_ingest_files`
-- Imports (local): `cv_compiler.llm.config` → `src/cv_compiler/llm/config.py`, `cv_compiler.llm.experience` → `src/cv_compiler/llm/experience.py`, `cv_compiler.llm.openai` → `src/cv_compiler/llm/openai.py`
+- Imports (local): `cv_compiler.llm.config` → `src/cv_compiler/llm/config.py`, `cv_compiler.llm.openai` → `src/cv_compiler/llm/openai.py`
 - Imported by (local): `cv_compiler.ingest`, `tests.test_pdf_ingest`
 - External import roots: `dataclasses`, `json`, `pathlib`, `pypdf`, `re`, `typing`, `urllib`, `yaml`
 
@@ -132,7 +132,7 @@ Deterministic index of files + local import connections (includes tests).
 - Doc: Helpers for LLM-derived experience generation.
 - Defines: `ExperienceTemplate`, `_collect_allowed_numbers`, `_derive_experience_id`, `_extract_yaml_payload`, `_safe_id`, `_strip_code_fence`, `_strip_fence_language`, `_validate_bullet_numbers`, `archive_user_experience_files`, `build_experience_prompt`, `load_experience_templates`, `parse_experience_drafts`, `write_experience_artifacts`
 - Imports (local): `cv_compiler.llm.base` → `src/cv_compiler/llm/base.py`, `cv_compiler.schema.models` → `src/cv_compiler/schema/models.py`
-- Imported by (local): `cv_compiler.ingest.pdf_ingest`, `cv_compiler.llm.manual`, `cv_compiler.llm.openai`, `cv_compiler.pipeline`, `tests.test_llm_experience_parsing`
+- Imported by (local): `cv_compiler.llm.manual`, `cv_compiler.llm.openai`, `cv_compiler.pipeline`, `tests.test_llm_experience_parsing`
 - External import roots: `dataclasses`, `pathlib`, `re`, `time`, `typing`, `yaml`
 
 ### `src/cv_compiler/llm/manual.py`
@@ -211,16 +211,16 @@ Deterministic index of files + local import connections (includes tests).
 
 - Module: `cv_compiler.render.markdown`
 - Doc: Markdown rendering for CV content.
-- Defines: `build_markdown`, `normalize_markdown_text`
+- Defines: `_bold_first_keyword`, `_bold_numeric_tokens`, `_emphasize_experience_bullet`, `_first_clause_end`, `_fix_spacing`, `build_markdown`, `normalize_markdown_text`
 - Imports (local): `cv_compiler.schema.models` → `src/cv_compiler/schema/models.py`, `cv_compiler.select.types` → `src/cv_compiler/select/types.py`
 - Imported by (local): `cv_compiler.render.renderer`, `tests.test_markdown_normalization`
-- External import roots: `unicodedata`
+- External import roots: `re`, `unicodedata`
 
 ### `src/cv_compiler/render/renderer.py`
 
 - Module: `cv_compiler.render.renderer`
 - Doc: Rendering interface for CV output.
-- Defines: `_normalize_pdf_text`, `_render_rich_line`, `_split_bold`, `render_cv`, `render_markdown_to_pdf`
+- Defines: `_normalize_pdf_text`, `_render_rich_line`, `_split_bold`, `_write_tokens_line`, `render_cv`, `render_markdown_to_pdf`
 - Imports (local): `cv_compiler.render.markdown` → `src/cv_compiler/render/markdown.py`, `cv_compiler.render.types` → `src/cv_compiler/render/types.py`
 - Imported by (local): `cv_compiler.pipeline`, `cv_compiler.render`, `tests.test_signatures`
 - External import roots: `datetime`, `fpdf`, `pathlib`
