@@ -46,6 +46,13 @@ Notes:
 - `OpenAIProvider(config: LLMConfig, prompt_path: Path, templates_path: Path)` (`src/cv_compiler/llm/openai.py`)
 - `ManualProvider(request_path: Path, response_path: Path, model: str = "manual", base_url: str | None = None, prompt_path: Path, templates_path: Path)` (`src/cv_compiler/llm/manual.py`)
 
+## Ingestion (`src/cv_compiler/ingest/*`)
+
+- `ParsedCv(profile: ParsedProfile, experience: tuple[ParsedExperience, ...], projects: tuple[ParsedProject, ...], skills: tuple[ParsedSkillCategory, ...], education: tuple[ParsedEducation, ...])`
+- `IngestResult(written_paths: tuple[Path, ...], warnings: tuple[str, ...])`
+- `extract_pdf_text(path: Path) -> str`
+- `ingest_pdf_to_markdown(data_dir: Path, pdf_path: Path, llm_mode: str, llm_config: LLMConfig | None, prompt_path: Path = Path("prompts/pdf_ingest_prompt.md"), overwrite: bool = False, request_path: Path | None = None, response_path: Path | None = None, manual_model: str = "manual", manual_base_url: str | None = None) -> IngestResult`
+
 ## Rendering (`src/cv_compiler/render/*`)
 
 - `RenderFormat` enum (`src/cv_compiler/render/types.py`)

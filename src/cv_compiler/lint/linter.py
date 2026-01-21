@@ -75,6 +75,17 @@ def lint_build_inputs(data: CanonicalData) -> Sequence[LintIssue]:
 
     lint_text(data.profile.about_me, source_path=data.profile.source_path, field="profile.about_me")
 
+    for link in data.profile.links:
+        if not link.url:
+            issues.append(
+                LintIssue(
+                    code="PROFILE_LINK_URL_MISSING",
+                    message="Profile link is missing a URL; it will be skipped.",
+                    severity=Severity.WARNING,
+                    source_path=data.profile.source_path,
+                )
+            )
+
     for e in data.experience:
         for bullet in e.bullets:
             lint_text(bullet, source_path=e.source_path, field=f"experience[{e.id}].bullets")

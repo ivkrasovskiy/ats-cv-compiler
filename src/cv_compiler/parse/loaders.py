@@ -110,9 +110,14 @@ def _load_profile(path: Path) -> Profile:
     link_items = _require_list_of_mapping(fm, "links", source=path)
     links: list[Link] = []
     for item in link_items:
-        label = _require_str(item, "label", source=path)
-        url = _require_str(item, "url", source=path)
-        links.append(Link(label=label, url=url))
+        label = _optional_str(item, "label")
+        url = _optional_str(item, "url")
+        if not label and not url:
+            continue
+        if not url:
+            links.append(Link(label=label or "", url=""))
+            continue
+        links.append(Link(label=label or url, url=url))
     return Profile(
         id=profile_id,
         name=name,

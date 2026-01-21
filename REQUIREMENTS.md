@@ -74,6 +74,8 @@ Command names are illustrative; exact flags may evolve, but behavior must match.
   - Validates schema and enforces ATS constraints.
 - `cv explain --job jobs/<file>`
   - Shows why items were selected (scores, matched keywords, rules triggered).
+- `cv to_mds_from_pdf`
+  - Extracts a PDF CV into canonical Markdown files under `data/`.
 
 ## Deterministic Selection (MVP)
 Selection must be deterministic given the same inputs:

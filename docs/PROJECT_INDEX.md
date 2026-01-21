@@ -4,8 +4,8 @@ Deterministic index of files + local import connections (includes tests).
 
 ## Overview
 
-- Python modules indexed: 36
-- Other files indexed: 31
+- Python modules indexed: 40
+- Other files indexed: 40
 
 ## Python Modules
 
@@ -50,7 +50,7 @@ Deterministic index of files + local import connections (includes tests).
 - Module: `cv_compiler.cli`
 - Doc: CLI argument parsing and command dispatch.
 - Defines: `_build_parser`, `_normalize_llm_mode`, `_prompt_llm_mode`, `_resolve_example_root`, `_resolve_llm_mode`, `main`
-- Imports (local): `cv_compiler.explain` → `src/cv_compiler/explain.py`, `cv_compiler.lint.linter` → `src/cv_compiler/lint/linter.py`, `cv_compiler.llm` → `src/cv_compiler/llm/__init__.py`, `cv_compiler.llm.config` → `src/cv_compiler/llm/config.py`, `cv_compiler.parse.loaders` → `src/cv_compiler/parse/loaders.py`, `cv_compiler.pipeline` → `src/cv_compiler/pipeline.py`, `cv_compiler.render.types` → `src/cv_compiler/render/types.py`, `cv_compiler.select.selector` → `src/cv_compiler/select/selector.py`, `cv_compiler.types` → `src/cv_compiler/types.py`
+- Imports (local): `cv_compiler.explain` → `src/cv_compiler/explain.py`, `cv_compiler.ingest` → `src/cv_compiler/ingest/__init__.py`, `cv_compiler.lint.linter` → `src/cv_compiler/lint/linter.py`, `cv_compiler.llm` → `src/cv_compiler/llm/__init__.py`, `cv_compiler.llm.config` → `src/cv_compiler/llm/config.py`, `cv_compiler.parse.loaders` → `src/cv_compiler/parse/loaders.py`, `cv_compiler.pipeline` → `src/cv_compiler/pipeline.py`, `cv_compiler.render.types` → `src/cv_compiler/render/types.py`, `cv_compiler.select.selector` → `src/cv_compiler/select/selector.py`, `cv_compiler.types` → `src/cv_compiler/types.py`
 - Imported by (local): `cv_compiler.__main__`, `tests.test_cli_parsing`
 - External import roots: `argparse`, `collections`, `os`, `pathlib`, `sys`
 
@@ -62,6 +62,24 @@ Deterministic index of files + local import connections (includes tests).
 - Imports (local): `cv_compiler.select.types` → `src/cv_compiler/select/types.py`
 - Imported by (local): `cv_compiler.cli`, `tests.test_signatures`
 - External import roots: (none)
+
+### `src/cv_compiler/ingest/__init__.py`
+
+- Module: `cv_compiler.ingest`
+- Doc: Ingestion helpers for bootstrapping canonical data.
+- Defines: (none)
+- Imports (local): `cv_compiler.ingest.pdf_ingest` → `src/cv_compiler/ingest/pdf_ingest.py`
+- Imported by (local): `cv_compiler.cli`
+- External import roots: (none)
+
+### `src/cv_compiler/ingest/pdf_ingest.py`
+
+- Module: `cv_compiler.ingest.pdf_ingest`
+- Doc: PDF ingestion helpers for bootstrapping canonical Markdown files.
+- Defines: `IngestResult`, `ParsedCv`, `ParsedEducation`, `ParsedExperience`, `ParsedLink`, `ParsedProfile`, `ParsedProject`, `ParsedSkillCategory`, `_build_ingest_prompt`, `_coerce_str`, `_coerce_str_list`, `_ensure_writable`, `_ingest_schema`, `_manual_llm_content`, `_parse_education`, `_parse_experience`, `_parse_links`, `_parse_projects`, `_parse_skills`, `_request_llm_content`, `_require_field`, `_slugify`, `_unique_id`, `_write_frontmatter`, `extract_pdf_text`, `ingest_pdf_to_markdown`, `parse_ingest_payload`, `parse_ingest_response`, `write_ingest_files`
+- Imports (local): `cv_compiler.llm.config` → `src/cv_compiler/llm/config.py`, `cv_compiler.llm.openai` → `src/cv_compiler/llm/openai.py`
+- Imported by (local): `cv_compiler.ingest`, `tests.test_pdf_ingest`
+- External import roots: `dataclasses`, `json`, `pathlib`, `pypdf`, `re`, `typing`, `urllib`, `yaml`
 
 ### `src/cv_compiler/lint/__init__.py`
 
@@ -105,7 +123,7 @@ Deterministic index of files + local import connections (includes tests).
 - Doc: LLM configuration (optional).
 - Defines: `LLMConfig`, `_parse_timeout`, `read_env_file`, `upsert_env_value`
 - Imports (local): (none)
-- Imported by (local): `cv_compiler.cli`, `cv_compiler.llm`, `cv_compiler.llm.openai`, `tests.test_llm_config`
+- Imported by (local): `cv_compiler.cli`, `cv_compiler.ingest.pdf_ingest`, `cv_compiler.llm`, `cv_compiler.llm.openai`, `tests.test_llm_config`
 - External import roots: `dataclasses`, `os`, `pathlib`
 
 ### `src/cv_compiler/llm/experience.py`
@@ -130,9 +148,9 @@ Deterministic index of files + local import connections (includes tests).
 
 - Module: `cv_compiler.llm.openai`
 - Doc: OpenAI-compatible LLM provider (chat-completions).
-- Defines: `OpenAIProvider`, `_chat_completion`, `build_chat_endpoint`, `build_chat_payload`, `experience_response_schema`, `extract_chat_content`
+- Defines: `OpenAIProvider`, `build_chat_endpoint`, `build_chat_payload`, `experience_response_schema`, `extract_chat_content`, `request_chat_completion`
 - Imports (local): `cv_compiler.llm.base` → `src/cv_compiler/llm/base.py`, `cv_compiler.llm.config` → `src/cv_compiler/llm/config.py`, `cv_compiler.llm.experience` → `src/cv_compiler/llm/experience.py`, `cv_compiler.schema.models` → `src/cv_compiler/schema/models.py`
-- Imported by (local): `cv_compiler.llm`, `cv_compiler.llm.manual`
+- Imported by (local): `cv_compiler.ingest.pdf_ingest`, `cv_compiler.llm`, `cv_compiler.llm.manual`
 - External import roots: `collections`, `json`, `pathlib`, `urllib`
 
 ### `src/cv_compiler/parse/__init__.py`
@@ -150,7 +168,7 @@ Deterministic index of files + local import connections (includes tests).
 - Doc: Frontmatter parsing for Markdown sources.
 - Defines: `MarkdownDocument`, `parse_markdown_frontmatter`
 - Imports (local): (none)
-- Imported by (local): `cv_compiler.parse.loaders`, `tests.test_signatures`
+- Imported by (local): `cv_compiler.parse.loaders`, `tests.test_pdf_ingest`, `tests.test_signatures`
 - External import roots: `collections`, `dataclasses`, `pathlib`, `typing`, `yaml`
 
 ### `src/cv_compiler/parse/loaders.py`
@@ -261,6 +279,15 @@ Deterministic index of files + local import connections (includes tests).
 - Imported by (local): `cv_compiler.cli`, `cv_compiler.lint.linter`, `cv_compiler.pipeline`, `tests.test_build_example`, `tests.test_signatures`
 - External import roots: `dataclasses`, `enum`, `pathlib`
 
+### `tests/__init__.py`
+
+- Module: `tests.__init__`
+- Doc: Test package marker for unittest discovery.
+- Defines: (none)
+- Imports (local): (none)
+- Imported by (local): (none)
+- External import roots: (none)
+
 ### `tests/test_build_example.py`
 
 - Module: `tests.test_build_example`
@@ -277,7 +304,7 @@ Deterministic index of files + local import connections (includes tests).
 - Defines: `TestCliParsing`
 - Imports (local): `cv_compiler.cli` → `src/cv_compiler/cli.py`
 - Imported by (local): (none)
-- External import roots: `unittest`
+- External import roots: `contextlib`, `io`, `unittest`
 
 ### `tests/test_experience_loading.py`
 
@@ -315,6 +342,15 @@ Deterministic index of files + local import connections (includes tests).
 - Imported by (local): (none)
 - External import roots: `json`, `pathlib`, `tempfile`, `unittest`
 
+### `tests/test_pdf_ingest.py`
+
+- Module: `tests.test_pdf_ingest`
+- Doc: Tests for PDF ingestion helpers.
+- Defines: `TestPdfIngest`
+- Imports (local): `cv_compiler.ingest.pdf_ingest` → `src/cv_compiler/ingest/pdf_ingest.py`, `cv_compiler.parse.frontmatter` → `src/cv_compiler/parse/frontmatter.py`
+- Imported by (local): (none)
+- External import roots: `pathlib`, `tempfile`, `unittest`
+
 ### `tests/test_profile_about_me.py`
 
 - Module: `tests.test_profile_about_me`
@@ -347,6 +383,14 @@ Deterministic index of files + local import connections (includes tests).
 - `config/llm.env`
 - `config/llm.env.example`
 - `data/README.md`
+- `data/cv.pdf`
+- `data/education.md`
+- `data/experience/exp_avito_leading_classifieds_platform_hybrid_moscow_remote__2021.md`
+- `data/experience/exp_avito_moscow_2018.md`
+- `data/experience/exp_startup_consulting_2024.md`
+- `data/experience/exp_velotix_data_governance_platform_israel_2024.md`
+- `data/profile.md`
+- `data/skills.md`
 - `docs/ENTITIES.md`
 - `docs/PROJECT_INDEX.md`
 - `examples/README.md`
@@ -363,6 +407,7 @@ Deterministic index of files + local import connections (includes tests).
 - `project_layout.md`
 - `prompts/experience_prompt.md`
 - `prompts/experience_templates.yaml`
+- `prompts/pdf_ingest_prompt.md`
 - `pyproject.toml`
 - `templates/README.md`
 - `uv.lock`

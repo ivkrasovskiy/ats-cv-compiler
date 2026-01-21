@@ -47,3 +47,35 @@ categories:
             )
             data = load_canonical_data(root / "data")
             self.assertEqual(data.profile.about_me, "Builds software.")
+
+    def test_profile_links_allow_missing_urls(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write(
+                root / "data" / "profile.md",
+                """---
+id: profile
+name: "Test User"
+headline: "Engineer"
+location: "Remote"
+email: "test@example.com"
+links:
+  - label: "LinkedIn"
+    url: null
+about_me: "Builds software."
+---
+""",
+            )
+            _write(
+                root / "data" / "skills.md",
+                """---
+id: skills
+categories:
+  - name: "Languages"
+    items: ["Python"]
+---
+""",
+            )
+            data = load_canonical_data(root / "data")
+            self.assertEqual(len(data.profile.links), 1)
+            self.assertEqual(data.profile.links[0].url, "")

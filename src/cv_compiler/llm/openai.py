@@ -61,7 +61,7 @@ class OpenAIProvider(LLMProvider):
             projects=tuple(projects),
             job=job,
         )
-        content = _chat_completion(
+        content = request_chat_completion(
             self._config,
             prompt,
             response_format=experience_response_schema(),
@@ -69,7 +69,7 @@ class OpenAIProvider(LLMProvider):
         return parse_experience_drafts(content)
 
 
-def _chat_completion(
+def request_chat_completion(
     config: LLMConfig, prompt: str, response_format: dict[str, object] | None
 ) -> str:
     url = build_chat_endpoint(config.base_url)

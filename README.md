@@ -26,11 +26,20 @@ It supports:
 - `uv run cv build --example basic --no-pdf` (Markdown only)
 - `uv run cv build --example basic --from-markdown examples/basic/out/cv_generic.md`
 
+## Import from PDF
+
+Place your PDF at `data/cv.pdf` (or pass `--pdf`) and run:
+
+- `uv run cv to_mds_from_pdf`
+
+This writes canonical Markdown files into `data/` so you can edit and then run `cv build`.
+
 Optional:
 - `uv run cv build --example basic --job examples/basic/jobs/backend_engineer.md`
 
 Profile field change:
 - `profile.md` now uses `about_me` (string paragraph) instead of `summary` (bullet list).
+ - Links with missing URLs are skipped with a warning.
 
 ## LLM (optional, not required)
 
@@ -71,6 +80,10 @@ Manual/offline LLM mode:
   `out/llm_response.json`. Paste the model response (raw YAML/JSON or full OpenAI-style JSON)
   into the response file and re-run the build.
 - If `CV_LLM_MODE` is not set, the CLI prompts once and stores it in `config/llm.env`.
+
+Manual/offline PDF ingestion:
+- `cv to_mds_from_pdf` writes `data/llm_ingest_request.json` and expects
+  `data/llm_ingest_response.json` when `CV_LLM_MODE=offline`.
 
 Project requirements for LLM:
 - Projects should include `company`, `role`, `start_date`, and optional `end_date` in frontmatter.

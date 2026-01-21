@@ -200,6 +200,10 @@ out/
 examples/**/out/
 !examples/**/out/.gitkeep
 
+# Local data (track only the README)
+data/*
+!data/README.md
+
 # Temporary working artifacts
 tmp/
 

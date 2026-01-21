@@ -14,6 +14,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from cv_compiler.explain import format_selection_explanation
+from cv_compiler.ingest import ingest_pdf_to_markdown
 from cv_compiler.lint.linter import lint_build_inputs
 from cv_compiler.llm import LLMConfig, ManualProvider, NoopProvider, OpenAIProvider
 from cv_compiler.llm.config import read_env_file, upsert_env_value
@@ -89,6 +90,33 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     explain_inputs.add_argument(
         "--example", type=str, default=None, help="Use a bundled example dataset by name."
+    )
+
+    ingest = sub.add_parser(
+        "to_mds_from_pdf", help="Extract a PDF CV into canonical Markdown files."
+    )
+    ingest.add_argument(
+        "--data",
+        type=str,
+        default=None,
+        help="Path to canonical data directory (default: ./data).",
+    )
+    ingest.add_argument(
+        "--pdf",
+        type=str,
+        default=None,
+        help="Path to the PDF CV (default: <data>/cv.pdf).",
+    )
+    ingest.add_argument(
+        "--llm",
+        type=str,
+        default="openai",
+        help="LLM provider for structuring the PDF text (default: openai).",
+    )
+    ingest.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Overwrite existing markdown files in the data directory.",
     )
 
     return parser
@@ -303,6 +331,64 @@ def main(argv: Sequence[str] | None = None) -> int:
 
             selection = select_content(data, job)
             print(format_selection_explanation(selection))
+            return 0
+        case "to_mds_from_pdf":
+            data_dir = Path(args.data) if args.data else Path("data")
+            pdf_path = Path(args.pdf) if args.pdf else data_dir / "cv.pdf"
+            if not pdf_path.exists():
+                print(f"PDF not found: {pdf_path}", file=sys.stderr)
+                return 2
+
+            if args.llm != "openai":
+                print(
+                    f"Unsupported LLM provider for ingestion: {args.llm!r} (supported: openai)",
+                    file=sys.stderr,
+                )
+                return 2
+
+            env_path = Path("config/llm.env")
+            mode = _resolve_llm_mode(env_path)
+            if mode == "api":
+                config = LLMConfig.from_env(env_path=env_path)
+                if config is None:
+                    print(
+                        "Missing LLM config. Set CV_LLM_BASE_URL and CV_LLM_MODEL "
+                        "(optional CV_LLM_API_KEY).",
+                        file=sys.stderr,
+                    )
+                    return 2
+                llm_config = config
+                model = config.model
+                base_url = config.base_url
+            else:
+                file_values = read_env_file(env_path)
+                llm_config = None
+                model = (
+                    os.getenv("CV_LLM_MODEL") or file_values.get("CV_LLM_MODEL") or "manual"
+                )
+                base_url = os.getenv("CV_LLM_BASE_URL") or file_values.get("CV_LLM_BASE_URL")
+
+            try:
+                result = ingest_pdf_to_markdown(
+                    data_dir=data_dir,
+                    pdf_path=pdf_path,
+                    llm_mode=mode,
+                    llm_config=llm_config,
+                    overwrite=args.overwrite,
+                    request_path=data_dir / "llm_ingest_request.json",
+                    response_path=data_dir / "llm_ingest_response.json",
+                    manual_model=model,
+                    manual_base_url=base_url,
+                )
+            except Exception as exc:  # noqa: BLE001
+                print(f"PDF ingestion failed: {exc}", file=sys.stderr)
+                return 1
+
+            for warning in result.warnings:
+                print(f"WARNING INGEST: {warning}", file=sys.stderr)
+
+            for path in result.written_paths:
+                print(path)
             return 0
         case _:
             parser.error(f"Unknown command: {args.command}")

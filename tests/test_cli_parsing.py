@@ -40,3 +40,8 @@ class TestCliParsing(unittest.TestCase):
         parser = _build_parser()
         args = parser.parse_args(["build", "--from-markdown", "out/cv_generic.md"])
         self.assertEqual(args.from_markdown, "out/cv_generic.md")
+
+    def test_ingest_accepts_pdf_flag(self) -> None:
+        parser = _build_parser()
+        args = parser.parse_args(["to_mds_from_pdf", "--pdf", "data/cv.pdf"])
+        self.assertEqual(args.pdf, "data/cv.pdf")
