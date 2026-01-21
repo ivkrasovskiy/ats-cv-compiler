@@ -7,6 +7,9 @@ Rules:
 - Keep bullet wording close to the source text.
 - Output JSON only. No extra commentary.
 - Place each role/experience entry into the projects list; leave experience as an empty list.
+- In projects, `name` is the project/role label (NOT the employer name).
+- In projects, `company` is the employer/organization name.
+- Work mode/location (e.g., Remote/Hybrid/City) belongs in `location` when present.
 
 PDF_TEXT:
 {{PDF_TEXT}}
