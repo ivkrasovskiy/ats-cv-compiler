@@ -26,8 +26,7 @@ email: "test@example.com"
 links:
   - label: "GitHub"
     url: "https://github.com/test"
-summary:
-  - "Builds software."
+about_me: "Builds software."
 ---
 """
 

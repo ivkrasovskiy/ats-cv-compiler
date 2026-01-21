@@ -25,7 +25,7 @@ class Profile:
     location: str
     email: str | None
     links: tuple[Link, ...]
-    summary: tuple[str, ...]
+    about_me: str
     source_path: Path | None = None
 
 

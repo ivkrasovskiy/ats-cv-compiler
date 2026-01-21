@@ -9,7 +9,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from cv_compiler.llm.config import LLMConfig
+from cv_compiler.llm.config import LLMConfig, read_env_file, upsert_env_value
 
 
 class TestLLMConfig(unittest.TestCase):
@@ -60,3 +60,10 @@ class TestLLMConfig(unittest.TestCase):
                     os.environ.pop("CV_LLM_TIMEOUT_SECONDS", None)
                 else:
                     os.environ["CV_LLM_TIMEOUT_SECONDS"] = old_timeout
+
+    def test_upsert_env_value(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            env_path = Path(tmp) / "llm.env"
+            upsert_env_value(env_path, "CV_LLM_MODE", "offline")
+            values = read_env_file(env_path)
+            self.assertEqual(values.get("CV_LLM_MODE"), "offline")

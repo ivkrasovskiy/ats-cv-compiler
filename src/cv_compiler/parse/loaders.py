@@ -106,7 +106,7 @@ def _load_profile(path: Path) -> Profile:
     headline = _require_str(fm, "headline", source=path)
     location = _require_str(fm, "location", source=path)
     email = _optional_str(fm, "email")
-    summary = _require_list_of_str(fm, "summary", source=path)
+    about_me = _require_str(fm, "about_me", source=path)
     link_items = _require_list_of_mapping(fm, "links", source=path)
     links: list[Link] = []
     for item in link_items:
@@ -120,7 +120,7 @@ def _load_profile(path: Path) -> Profile:
         location=location,
         email=email,
         links=tuple(links),
-        summary=summary,
+        about_me=about_me,
         source_path=path,
     )
 

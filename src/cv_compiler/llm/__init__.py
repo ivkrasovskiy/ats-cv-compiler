@@ -9,6 +9,14 @@ from __future__ import annotations
 
 from .base import ExperienceDraft, LLMProvider, NoopProvider
 from .config import LLMConfig
+from .manual import ManualProvider
 from .openai import OpenAIProvider
 
-__all__ = ["ExperienceDraft", "LLMConfig", "LLMProvider", "NoopProvider", "OpenAIProvider"]
+__all__ = [
+    "ExperienceDraft",
+    "LLMConfig",
+    "LLMProvider",
+    "ManualProvider",
+    "NoopProvider",
+    "OpenAIProvider",
+]

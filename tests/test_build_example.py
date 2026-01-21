@@ -45,6 +45,10 @@ class TestBuildExample(unittest.TestCase):
             self.assertTrue(result1.output_path.exists())
             self.assertEqual(result1.output_path.name, "cv_generic.pdf")
             self.assertTrue(result1.output_path.read_bytes().startswith(b"%PDF"))
+            self.assertIsNotNone(result1.markdown_path)
+            assert result1.markdown_path is not None
+            self.assertTrue(result1.markdown_path.exists())
+            self.assertEqual(result1.markdown_path.name, "cv_generic.md")
             self.assertFalse(any(i.severity == Severity.ERROR for i in result1.issues))
             digest1 = _sha256(result1.output_path)
 
@@ -84,3 +88,31 @@ class TestBuildExample(unittest.TestCase):
             self.assertTrue(result.output_path.exists())
             self.assertTrue(result.output_path.name.startswith("cv_job_backend_engineer."))
             self.assertTrue(result.output_path.read_bytes().startswith(b"%PDF"))
+            self.assertIsNotNone(result.markdown_path)
+            assert result.markdown_path is not None
+            self.assertTrue(result.markdown_path.exists())
+
+    def test_build_example_markdown_only(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        data_dir = root / "examples" / "basic" / "data"
+        template_dir = root / "examples" / "basic" / "templates"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out_dir = Path(tmp)
+            result = build_cv(
+                BuildRequest(
+                    data_dir=data_dir,
+                    job_path=None,
+                    template_dir=template_dir,
+                    out_dir=out_dir,
+                    format=RenderFormat.MARKDOWN,
+                    llm=None,
+                    llm_instructions_path=None,
+                )
+            )
+            self.assertTrue(result.output_path.exists())
+            self.assertTrue(result.output_path.name.endswith(".md"))
+            self.assertIsNotNone(result.markdown_path)
+            assert result.markdown_path is not None
+            self.assertEqual(result.output_path, result.markdown_path)
+            self.assertIsNone(result.pdf_path)

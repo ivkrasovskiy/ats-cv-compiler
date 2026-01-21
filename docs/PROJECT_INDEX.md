@@ -4,8 +4,8 @@ Deterministic index of files + local import connections (includes tests).
 
 ## Overview
 
-- Python modules indexed: 32
-- Other files indexed: 26
+- Python modules indexed: 36
+- Other files indexed: 31
 
 ## Python Modules
 
@@ -49,10 +49,10 @@ Deterministic index of files + local import connections (includes tests).
 
 - Module: `cv_compiler.cli`
 - Doc: CLI argument parsing and command dispatch.
-- Defines: `_build_parser`, `_resolve_example_root`, `main`
-- Imports (local): `cv_compiler.explain` → `src/cv_compiler/explain.py`, `cv_compiler.lint.linter` → `src/cv_compiler/lint/linter.py`, `cv_compiler.llm` → `src/cv_compiler/llm/__init__.py`, `cv_compiler.parse.loaders` → `src/cv_compiler/parse/loaders.py`, `cv_compiler.pipeline` → `src/cv_compiler/pipeline.py`, `cv_compiler.render.types` → `src/cv_compiler/render/types.py`, `cv_compiler.select.selector` → `src/cv_compiler/select/selector.py`, `cv_compiler.types` → `src/cv_compiler/types.py`
+- Defines: `_build_parser`, `_normalize_llm_mode`, `_prompt_llm_mode`, `_resolve_example_root`, `_resolve_llm_mode`, `main`
+- Imports (local): `cv_compiler.explain` → `src/cv_compiler/explain.py`, `cv_compiler.lint.linter` → `src/cv_compiler/lint/linter.py`, `cv_compiler.llm` → `src/cv_compiler/llm/__init__.py`, `cv_compiler.llm.config` → `src/cv_compiler/llm/config.py`, `cv_compiler.parse.loaders` → `src/cv_compiler/parse/loaders.py`, `cv_compiler.pipeline` → `src/cv_compiler/pipeline.py`, `cv_compiler.render.types` → `src/cv_compiler/render/types.py`, `cv_compiler.select.selector` → `src/cv_compiler/select/selector.py`, `cv_compiler.types` → `src/cv_compiler/types.py`
 - Imported by (local): `cv_compiler.__main__`, `tests.test_cli_parsing`
-- External import roots: `argparse`, `collections`, `pathlib`, `sys`
+- External import roots: `argparse`, `collections`, `os`, `pathlib`, `sys`
 
 ### `src/cv_compiler/explain.py`
 
@@ -86,7 +86,7 @@ Deterministic index of files + local import connections (includes tests).
 - Module: `cv_compiler.llm`
 - Doc: Optional LLM interfaces and providers.
 - Defines: (none)
-- Imports (local): `cv_compiler.llm.base` → `src/cv_compiler/llm/base.py`, `cv_compiler.llm.config` → `src/cv_compiler/llm/config.py`, `cv_compiler.llm.openai` → `src/cv_compiler/llm/openai.py`
+- Imports (local): `cv_compiler.llm.base` → `src/cv_compiler/llm/base.py`, `cv_compiler.llm.config` → `src/cv_compiler/llm/config.py`, `cv_compiler.llm.manual` → `src/cv_compiler/llm/manual.py`, `cv_compiler.llm.openai` → `src/cv_compiler/llm/openai.py`
 - Imported by (local): `cv_compiler.cli`
 - External import roots: (none)
 
@@ -96,16 +96,16 @@ Deterministic index of files + local import connections (includes tests).
 - Doc: Optional LLM provider protocol and request types.
 - Defines: `BulletRewriteRequest`, `BulletRewriteResult`, `ExperienceDraft`, `LLMProvider`, `NoopProvider`
 - Imports (local): `cv_compiler.schema.models` → `src/cv_compiler/schema/models.py`
-- Imported by (local): `cv_compiler.llm`, `cv_compiler.llm.experience`, `cv_compiler.llm.openai`, `cv_compiler.pipeline`, `tests.test_signatures`
+- Imported by (local): `cv_compiler.llm`, `cv_compiler.llm.experience`, `cv_compiler.llm.manual`, `cv_compiler.llm.openai`, `cv_compiler.pipeline`, `tests.test_signatures`
 - External import roots: `collections`, `dataclasses`, `typing`
 
 ### `src/cv_compiler/llm/config.py`
 
 - Module: `cv_compiler.llm.config`
 - Doc: LLM configuration (optional).
-- Defines: `LLMConfig`, `_load_env_file`, `_parse_timeout`
+- Defines: `LLMConfig`, `_parse_timeout`, `read_env_file`, `upsert_env_value`
 - Imports (local): (none)
-- Imported by (local): `cv_compiler.llm`, `cv_compiler.llm.openai`, `tests.test_llm_config`
+- Imported by (local): `cv_compiler.cli`, `cv_compiler.llm`, `cv_compiler.llm.openai`, `tests.test_llm_config`
 - External import roots: `dataclasses`, `os`, `pathlib`
 
 ### `src/cv_compiler/llm/experience.py`
@@ -114,16 +114,25 @@ Deterministic index of files + local import connections (includes tests).
 - Doc: Helpers for LLM-derived experience generation.
 - Defines: `ExperienceTemplate`, `_collect_allowed_numbers`, `_derive_experience_id`, `_extract_yaml_payload`, `_safe_id`, `_strip_code_fence`, `_strip_fence_language`, `_validate_bullet_numbers`, `archive_user_experience_files`, `build_experience_prompt`, `load_experience_templates`, `parse_experience_drafts`, `write_experience_artifacts`
 - Imports (local): `cv_compiler.llm.base` → `src/cv_compiler/llm/base.py`, `cv_compiler.schema.models` → `src/cv_compiler/schema/models.py`
-- Imported by (local): `cv_compiler.llm.openai`, `cv_compiler.pipeline`, `tests.test_llm_experience_parsing`
+- Imported by (local): `cv_compiler.llm.manual`, `cv_compiler.llm.openai`, `cv_compiler.pipeline`, `tests.test_llm_experience_parsing`
 - External import roots: `dataclasses`, `pathlib`, `re`, `time`, `typing`, `yaml`
+
+### `src/cv_compiler/llm/manual.py`
+
+- Module: `cv_compiler.llm.manual`
+- Doc: Manual/offline LLM provider.
+- Defines: `ManualProvider`, `_extract_response_content`
+- Imports (local): `cv_compiler.llm.base` → `src/cv_compiler/llm/base.py`, `cv_compiler.llm.experience` → `src/cv_compiler/llm/experience.py`, `cv_compiler.llm.openai` → `src/cv_compiler/llm/openai.py`, `cv_compiler.schema.models` → `src/cv_compiler/schema/models.py`
+- Imported by (local): `cv_compiler.llm`, `tests.test_llm_manual_provider`
+- External import roots: `collections`, `json`, `pathlib`
 
 ### `src/cv_compiler/llm/openai.py`
 
 - Module: `cv_compiler.llm.openai`
 - Doc: OpenAI-compatible LLM provider (chat-completions).
-- Defines: `OpenAIProvider`, `_chat_completion`
+- Defines: `OpenAIProvider`, `_chat_completion`, `build_chat_endpoint`, `build_chat_payload`, `experience_response_schema`, `extract_chat_content`
 - Imports (local): `cv_compiler.llm.base` → `src/cv_compiler/llm/base.py`, `cv_compiler.llm.config` → `src/cv_compiler/llm/config.py`, `cv_compiler.llm.experience` → `src/cv_compiler/llm/experience.py`, `cv_compiler.schema.models` → `src/cv_compiler/schema/models.py`
-- Imported by (local): `cv_compiler.llm`
+- Imported by (local): `cv_compiler.llm`, `cv_compiler.llm.manual`
 - External import roots: `collections`, `json`, `pathlib`, `urllib`
 
 ### `src/cv_compiler/parse/__init__.py`
@@ -150,7 +159,7 @@ Deterministic index of files + local import connections (includes tests).
 - Doc: Load canonical data and job specs from disk.
 - Defines: `_experience_base_and_priority`, `_load_education`, `_load_experience_entry`, `_load_profile`, `_load_project_entry`, `_load_skills`, `_optional_str`, `_optional_str_or_none`, `_require_list_of_mapping`, `_require_list_of_str`, `_require_mapping`, `_require_str`, `_select_experience_files`, `load_canonical_data`, `load_job_spec`
 - Imports (local): `cv_compiler.parse.frontmatter` → `src/cv_compiler/parse/frontmatter.py`, `cv_compiler.schema.models` → `src/cv_compiler/schema/models.py`
-- Imported by (local): `cv_compiler.cli`, `cv_compiler.parse`, `cv_compiler.pipeline`, `tests.test_experience_loading`, `tests.test_signatures`
+- Imported by (local): `cv_compiler.cli`, `cv_compiler.parse`, `cv_compiler.pipeline`, `tests.test_experience_loading`, `tests.test_profile_about_me`, `tests.test_signatures`
 - External import roots: `collections`, `pathlib`, `re`, `typing`
 
 ### `src/cv_compiler/pipeline.py`
@@ -171,14 +180,23 @@ Deterministic index of files + local import connections (includes tests).
 - Imported by (local): (none)
 - External import roots: (none)
 
+### `src/cv_compiler/render/markdown.py`
+
+- Module: `cv_compiler.render.markdown`
+- Doc: Markdown rendering for CV content.
+- Defines: `build_markdown`
+- Imports (local): `cv_compiler.schema.models` → `src/cv_compiler/schema/models.py`, `cv_compiler.select.types` → `src/cv_compiler/select/types.py`
+- Imported by (local): `cv_compiler.render.renderer`
+- External import roots: (none)
+
 ### `src/cv_compiler/render/renderer.py`
 
 - Module: `cv_compiler.render.renderer`
 - Doc: Rendering interface for CV output.
-- Defines: `render_cv`
-- Imports (local): `cv_compiler.render.types` → `src/cv_compiler/render/types.py`
+- Defines: `_strip_markdown_markup`, `render_cv`, `render_markdown_to_pdf`
+- Imports (local): `cv_compiler.render.markdown` → `src/cv_compiler/render/markdown.py`, `cv_compiler.render.types` → `src/cv_compiler/render/types.py`
 - Imported by (local): `cv_compiler.pipeline`, `cv_compiler.render`, `tests.test_signatures`
-- External import roots: `datetime`, `fpdf`
+- External import roots: `datetime`, `fpdf`, `pathlib`
 
 ### `src/cv_compiler/render/types.py`
 
@@ -204,7 +222,7 @@ Deterministic index of files + local import connections (includes tests).
 - Doc: Dataclasses representing validated CV entities.
 - Defines: `CanonicalData`, `Education`, `EducationEntry`, `ExperienceEntry`, `JobSpec`, `Link`, `Profile`, `ProjectEntry`, `Skills`, `SkillsCategory`
 - Imports (local): (none)
-- Imported by (local): `cv_compiler.lint.linter`, `cv_compiler.llm.base`, `cv_compiler.llm.experience`, `cv_compiler.llm.openai`, `cv_compiler.parse.loaders`, `cv_compiler.pipeline`, `cv_compiler.render.types`, `cv_compiler.schema`, `cv_compiler.select.selector`, `tests.test_signatures`
+- Imported by (local): `cv_compiler.lint.linter`, `cv_compiler.llm.base`, `cv_compiler.llm.experience`, `cv_compiler.llm.manual`, `cv_compiler.llm.openai`, `cv_compiler.parse.loaders`, `cv_compiler.pipeline`, `cv_compiler.render.markdown`, `cv_compiler.render.types`, `cv_compiler.schema`, `cv_compiler.select.selector`, `tests.test_llm_manual_provider`, `tests.test_signatures`
 - External import roots: `dataclasses`, `pathlib`
 
 ### `src/cv_compiler/select/__init__.py`
@@ -231,7 +249,7 @@ Deterministic index of files + local import connections (includes tests).
 - Doc: Selection result and decision types.
 - Defines: `SelectionDecision`, `SelectionResult`
 - Imports (local): (none)
-- Imported by (local): `cv_compiler.explain`, `cv_compiler.render.types`, `cv_compiler.select`, `cv_compiler.select.selector`, `tests.test_signatures`
+- Imported by (local): `cv_compiler.explain`, `cv_compiler.render.markdown`, `cv_compiler.render.types`, `cv_compiler.select`, `cv_compiler.select.selector`, `tests.test_signatures`
 - External import roots: `dataclasses`
 
 ### `src/cv_compiler/types.py`
@@ -288,6 +306,24 @@ Deterministic index of files + local import connections (includes tests).
 - Imported by (local): (none)
 - External import roots: `unittest`
 
+### `tests/test_llm_manual_provider.py`
+
+- Module: `tests.test_llm_manual_provider`
+- Doc: Tests for the manual/offline LLM provider.
+- Defines: `TestManualProvider`
+- Imports (local): `cv_compiler.llm.manual` → `src/cv_compiler/llm/manual.py`, `cv_compiler.schema.models` → `src/cv_compiler/schema/models.py`
+- Imported by (local): (none)
+- External import roots: `json`, `pathlib`, `tempfile`, `unittest`
+
+### `tests/test_profile_about_me.py`
+
+- Module: `tests.test_profile_about_me`
+- Doc: Tests for profile about_me parsing.
+- Defines: `TestProfileAboutMe`, `_write`
+- Imports (local): `cv_compiler.parse.loaders` → `src/cv_compiler/parse/loaders.py`
+- Imported by (local): (none)
+- External import roots: `pathlib`, `tempfile`, `unittest`
+
 ### `tests/test_signatures.py`
 
 - Module: `tests.test_signatures`
@@ -300,6 +336,10 @@ Deterministic index of files + local import connections (includes tests).
 ## Other Files
 
 - `.gitignore`
+- `.uv_cache/.gitignore`
+- `.uv_cache/CACHEDIR.TAG`
+- `.uv_cache/interpreter-v4/aarch64/a34cbc46e97e356f.msgpack`
+- `.uv_cache/sdists-v6/.gitignore`
 - `AGENTS.md`
 - `LICENSE`
 - `README.md`
@@ -313,6 +353,7 @@ Deterministic index of files + local import connections (includes tests).
 - `examples/basic/README.md`
 - `examples/basic/data/education.md`
 - `examples/basic/data/experience/2023-example-corp.md`
+- `examples/basic/data/experience/llm_exp_example_corp_2023_02.md`
 - `examples/basic/data/profile.md`
 - `examples/basic/data/projects/cli-cv-compiler.md`
 - `examples/basic/data/skills.md`

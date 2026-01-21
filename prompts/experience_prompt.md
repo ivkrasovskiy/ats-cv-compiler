@@ -15,6 +15,7 @@ Derive a structured Experience section from the provided projects. Each experien
 - Use bullet templates from the template list.
 - Contain at most 3 bullets per experience.
 - Produce at most 5 experiences total.
+- If a JOB is provided, prioritize bullets most relevant to the job keywords, without inventing facts.
 
 OUTPUT FORMAT (YAML ONLY, NO OTHER TEXT):
 experiences:

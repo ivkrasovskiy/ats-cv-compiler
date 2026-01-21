@@ -9,11 +9,8 @@ links:
     url: "https://github.com/alex-example"
   - label: "LinkedIn"
     url: "https://www.linkedin.com/in/alex-example/"
-summary:
-  - "Builds backend services and internal tools."
-  - "Prioritizes reliability, testing, and maintainability."
+about_me: "Builds backend services and internal tools. Prioritizes reliability, testing, and maintainability."
 ---
 
 Notes (not rendered):
 - This dataset is intentionally generic and is safe to modify.
-

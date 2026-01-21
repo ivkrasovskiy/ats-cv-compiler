@@ -31,7 +31,7 @@ This project treats a CV as compiled output:
 Stored in `data/` as Markdown files with YAML frontmatter.
 
 Minimum required entities:
-- `profile.md` (name, headline, location, links, summary)
+- `profile.md` (name, headline, location, links, about_me)
 - `experience/*.md`
 - `projects/*.md`
 - `skills.md`
@@ -55,6 +55,8 @@ A user-provided instruction file (e.g. `instructions/llm.md`) that:
 ### Required outputs (MVP)
 - `out/cv_generic.pdf`
 - `out/cv_<job>.pdf` (when job spec provided)
+- `out/cv_generic.md` (markdown source used for PDF rendering)
+- `out/cv_<job>.md` (when job spec provided)
 
 ### Optional outputs (post-MVP)
 - `.docx` export (ATS-friendly)

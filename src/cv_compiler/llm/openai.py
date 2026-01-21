@@ -61,22 +61,19 @@ class OpenAIProvider(LLMProvider):
             projects=tuple(projects),
             job=job,
         )
-        content = _chat_completion(self._config, prompt)
+        content = _chat_completion(
+            self._config,
+            prompt,
+            response_format=experience_response_schema(),
+        )
         return parse_experience_drafts(content)
 
 
-def _chat_completion(config: LLMConfig, prompt: str) -> str:
-    url = config.base_url.rstrip("/")
-    if url.endswith("/v1"):
-        url = f"{url}/chat/completions"
-    else:
-        url = f"{url}/v1/chat/completions"
-
-    payload = {
-        "model": config.model,
-        "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.2,
-    }
+def _chat_completion(
+    config: LLMConfig, prompt: str, response_format: dict[str, object] | None
+) -> str:
+    url = build_chat_endpoint(config.base_url)
+    payload = build_chat_payload(config.model, prompt, response_format)
     data = json.dumps(payload).encode("utf-8")
 
     headers = {"Content-Type": "application/json"}
@@ -87,7 +84,76 @@ def _chat_completion(config: LLMConfig, prompt: str) -> str:
     with urlopen(req, timeout=config.timeout_seconds) as resp:  # noqa: S310
         body = resp.read().decode("utf-8")
     parsed = json.loads(body)
+    content = extract_chat_content(parsed)
+    if content is None:
+        raise ValueError("Unexpected LLM response shape")
+    return content
+
+
+def build_chat_endpoint(base_url: str) -> str:
+    url = base_url.rstrip("/")
+    if url.endswith("/v1"):
+        return f"{url}/chat/completions"
+    return f"{url}/v1/chat/completions"
+
+
+def build_chat_payload(
+    model: str,
+    prompt: str,
+    response_format: dict[str, object] | None,
+) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.2,
+    }
+    if response_format is not None:
+        payload["response_format"] = response_format
+    return payload
+
+
+def extract_chat_content(parsed: object) -> str | None:
+    if not isinstance(parsed, dict):
+        return None
     try:
         return parsed["choices"][0]["message"]["content"]
-    except (KeyError, IndexError, TypeError) as exc:
-        raise ValueError("Unexpected LLM response shape") from exc
+    except (KeyError, IndexError, TypeError):
+        return None
+
+
+def experience_response_schema() -> dict[str, object]:
+    return {
+        "type": "json_schema",
+        "json_schema": {
+            "name": "experience_response",
+            "schema": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["experiences"],
+                "properties": {
+                    "experiences": {
+                        "type": "array",
+                        "maxItems": 5,
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "required": ["id", "role", "source_project_ids", "bullets"],
+                            "properties": {
+                                "id": {"type": "string"},
+                                "role": {"type": "string"},
+                                "source_project_ids": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                },
+                                "bullets": {
+                                    "type": "array",
+                                    "maxItems": 3,
+                                    "items": {"type": "string"},
+                                },
+                            },
+                        },
+                    }
+                },
+            },
+        },
+    }

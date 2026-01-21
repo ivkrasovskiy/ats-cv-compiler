@@ -2,17 +2,19 @@
 Rendering interface for CV output.
 
 This module defines the `render_cv` entrypoint used by the pipeline to produce final artifacts.
-Implementation is currently stubbed.
+Rendering is markdown-first to keep PDF output deterministic and editable.
 """
 
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from pathlib import Path
 
 from fpdf import FPDF
 from fpdf.enums import XPos, YPos
 
-from cv_compiler.render.types import RenderRequest, RenderResult
+from cv_compiler.render.markdown import build_markdown
+from cv_compiler.render.types import RenderFormat, RenderRequest, RenderResult
 
 
 def render_cv(request: RenderRequest) -> RenderResult:
@@ -20,20 +22,30 @@ def render_cv(request: RenderRequest) -> RenderResult:
     output_path = request.output_path
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    data = request.data
-    selection = request.selection
+    markdown_path = request.markdown_path or output_path.with_suffix(".md")
+    markdown_path.parent.mkdir(parents=True, exist_ok=True)
+    markdown = build_markdown(request.data, request.selection)
+    markdown_path.write_text(markdown, encoding="utf-8")
 
-    selected_exp = set(selection.selected_experience_ids)
-    selected_proj = set(selection.selected_project_ids)
+    pdf_path: Path | None = None
+    if request.format == RenderFormat.PDF:
+        render_markdown_to_pdf(markdown, output_path)
+        pdf_path = output_path
+        output = output_path
+    else:
+        output = markdown_path
 
+    return RenderResult(output_path=output, markdown_path=markdown_path, pdf_path=pdf_path)
+
+
+def render_markdown_to_pdf(markdown: str, output_path: Path) -> None:
+    """Render a Markdown CV to PDF using a minimal, ATS-safe subset."""
     pdf = FPDF(orientation="P", unit="mm", format="A4")
     pdf.set_margins(left=15, top=15, right=15)
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
 
     pdf.set_creator("ats-cv-compiler")
-    pdf.set_author(data.profile.name)
-    pdf.set_title(f"{data.profile.name} - CV")
     pdf.set_creation_date(datetime(2000, 1, 1, tzinfo=UTC))
 
     def heading(text: str) -> None:
@@ -43,76 +55,63 @@ def render_cv(request: RenderRequest) -> RenderResult:
         pdf.cell(0, 6, text, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         pdf.set_font("Helvetica", size=10)
 
-    def paragraph(text: str) -> None:
-        pdf.set_font("Helvetica", size=10)
+    def subheading(text: str) -> None:
+        pdf.set_font("Helvetica", style="B", size=11)
         pdf.set_x(pdf.l_margin)
         pdf.multi_cell(0, 5, text)
-
-    def bullets(items: tuple[str, ...]) -> None:
         pdf.set_font("Helvetica", size=10)
-        for item in items:
-            pdf.set_x(pdf.l_margin)
-            pdf.multi_cell(0, 5, f"- {item}")
 
-    pdf.set_font("Helvetica", style="B", size=16)
-    pdf.set_x(pdf.l_margin)
-    pdf.cell(0, 8, data.profile.name, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-
-    pdf.set_font("Helvetica", size=11)
-    contact_parts: list[str] = [data.profile.headline, data.profile.location]
-    if data.profile.email:
-        contact_parts.append(data.profile.email)
-    contact_parts.extend([link.url for link in data.profile.links])
-    pdf.set_x(pdf.l_margin)
-    pdf.multi_cell(0, 5, " - ".join(part for part in contact_parts if part))
-
-    if data.profile.summary:
-        heading("Summary")
-        bullets(data.profile.summary)
-
-    if selected_exp:
-        heading("Experience")
-        for e in sorted(
-            [e for e in data.experience if e.id in selected_exp],
-            key=lambda x: (x.start_date, x.id),
-            reverse=True,
-        ):
-            pdf.set_font("Helvetica", style="B", size=11)
-            end = e.end_date or "Present"
-            location = f" ({e.location})" if e.location else ""
-            pdf.set_x(pdf.l_margin)
-            pdf.multi_cell(0, 5, f"{e.title} - {e.company}{location} | {e.start_date} - {end}")
-            pdf.set_font("Helvetica", size=10)
-            bullets(e.bullets)
-
-    if selected_proj:
-        heading("Projects")
-        for p in sorted([p for p in data.projects if p.id in selected_proj], key=lambda x: x.name):
-            pdf.set_font("Helvetica", style="B", size=11)
-            pdf.set_x(pdf.l_margin)
-            pdf.multi_cell(0, 5, p.name)
-            pdf.set_font("Helvetica", size=10)
-            bullets(p.bullets)
-
-    heading("Skills")
-    for cat in data.skills.categories:
-        pdf.set_font("Helvetica", style="B", size=10)
+    def paragraph(text: str, *, size: int = 10) -> None:
+        pdf.set_font("Helvetica", size=size)
         pdf.set_x(pdf.l_margin)
-        pdf.multi_cell(0, 5, cat.name)
-        pdf.set_font("Helvetica", size=10)
-        paragraph(", ".join(cat.items))
+        pdf.multi_cell(0, 5, _strip_markdown_markup(text))
 
-    if data.education and data.education.entries:
-        heading("Education")
-        for entry in data.education.entries:
-            start = entry.start_date or ""
-            end = entry.end_date or ""
-            dates = f"{start}-{end}".strip("-")
-            where = f" ({entry.location})" if entry.location else ""
-            line = f"{entry.degree} - {entry.institution}{where}"
-            if dates:
-                line = f"{line} | {dates}"
-            paragraph(line)
+    def bullet(text: str) -> None:
+        pdf.set_font("Helvetica", size=10)
+        pdf.set_x(pdf.l_margin)
+        pdf.multi_cell(0, 5, f"- {_strip_markdown_markup(text)}")
+
+    seen_name = False
+    seen_contact = False
+    for raw_line in markdown.splitlines():
+        line = raw_line.strip()
+        if not line:
+            pdf.ln(2)
+            continue
+
+        if line.startswith("# "):
+            title = line[2:].strip()
+            if title:
+                pdf.set_author(title)
+                pdf.set_title(f"{title} - CV")
+            pdf.set_font("Helvetica", style="B", size=16)
+            pdf.set_x(pdf.l_margin)
+            pdf.cell(0, 8, title, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            seen_name = True
+            seen_contact = False
+            continue
+
+        if line.startswith("## "):
+            heading(line[3:].strip())
+            continue
+
+        if line.startswith("### "):
+            subheading(line[4:].strip())
+            continue
+
+        if line.startswith("- "):
+            bullet(line[2:].strip())
+            continue
+
+        if seen_name and not seen_contact:
+            paragraph(line, size=11)
+            seen_contact = True
+            continue
+
+        paragraph(line, size=10)
 
     pdf.output(str(output_path))
-    return RenderResult(output_path=output_path)
+
+
+def _strip_markdown_markup(text: str) -> str:
+    return text.replace("**", "")

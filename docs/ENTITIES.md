@@ -5,7 +5,7 @@ This document describes the public-ish entities we expect in the MVP, focusing o
 ## Data model (`src/cv_compiler/schema/models.py`)
 
 - `Link(label: str, url: str)`
-- `Profile(id: str, name: str, headline: str, location: str, email: str | None, links: tuple[Link, ...], summary: tuple[str, ...], source_path: Path | None = None)`
+- `Profile(id: str, name: str, headline: str, location: str, email: str | None, links: tuple[Link, ...], about_me: str, source_path: Path | None = None)`
 - `ExperienceEntry(id: str, company: str, title: str, location: str | None, start_date: str, end_date: str | None, tags: tuple[str, ...], bullets: tuple[str, ...], source_path: Path | None = None)`
 - `ProjectEntry(id: str, name: str, company: str | None, role: str | None, start_date: str | None, end_date: str | None, tags: tuple[str, ...], bullets: tuple[str, ...], source_path: Path | None = None)`
 - `SkillsCategory(name: str, items: tuple[str, ...])`
@@ -44,14 +44,18 @@ Notes:
 - `LLMConfig(base_url: str, model: str, api_key: str | None = None, timeout_seconds: int = 300)` (`src/cv_compiler/llm/config.py`)
   - `from_env(prefix: str = "CV_LLM_", env_path: Path | None = Path("config/llm.env")) -> LLMConfig | None`
 - `OpenAIProvider(config: LLMConfig, prompt_path: Path, templates_path: Path)` (`src/cv_compiler/llm/openai.py`)
+- `ManualProvider(request_path: Path, response_path: Path, model: str = "manual", base_url: str | None = None, prompt_path: Path, templates_path: Path)` (`src/cv_compiler/llm/manual.py`)
 
 ## Rendering (`src/cv_compiler/render/*`)
 
 - `RenderFormat` enum (`src/cv_compiler/render/types.py`)
   - `RenderFormat.PDF`
-- `RenderRequest(data: CanonicalData, selection: SelectionResult, template_dir: Path, output_path: Path, format: RenderFormat = RenderFormat.PDF)`
-- `RenderResult(output_path: Path)`
+  - `RenderFormat.MARKDOWN`
+- `RenderRequest(data: CanonicalData, selection: SelectionResult, template_dir: Path, output_path: Path, format: RenderFormat = RenderFormat.PDF, markdown_path: Path | None = None)`
+- `RenderResult(output_path: Path, markdown_path: Path, pdf_path: Path | None)`
+- `build_markdown(data: CanonicalData, selection: SelectionResult) -> str` (`src/cv_compiler/render/markdown.py`)
 - `render_cv(request: RenderRequest) -> RenderResult` (`src/cv_compiler/render/renderer.py`)
+- `render_markdown_to_pdf(markdown: str, output_path: Path) -> None` (`src/cv_compiler/render/renderer.py`)
 
 ## Linting (`src/cv_compiler/lint/*`)
 
@@ -63,8 +67,8 @@ Notes:
 
 ## Pipeline (`src/cv_compiler/pipeline.py`)
 
-- `BuildRequest(data_dir: Path, job_path: Path | None, template_dir: Path, out_dir: Path, format: RenderFormat = RenderFormat.PDF, llm: LLMProvider | None = None, llm_instructions_path: Path | None = None, experience_regenerate: bool = False)`
-- `BuildResult(output_path: Path, issues: tuple[LintIssue, ...])`
+- `BuildRequest(data_dir: Path, job_path: Path | None, template_dir: Path, out_dir: Path, format: RenderFormat = RenderFormat.PDF, llm: LLMProvider | None = None, llm_instructions_path: Path | None = None, experience_regenerate: bool = False, render_from_markdown: Path | None = None)`
+- `BuildResult(output_path: Path, markdown_path: Path | None, pdf_path: Path | None, issues: tuple[LintIssue, ...])`
 - `build_cv(request: BuildRequest) -> BuildResult`
 
 ## Explain (`src/cv_compiler/explain.py`)

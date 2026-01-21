@@ -25,7 +25,7 @@ class LLMConfig:
         prefix: str = "CV_LLM_",
         env_path: Path | None = Path("config/llm.env"),
     ) -> LLMConfig | None:
-        file_values = _load_env_file(env_path) if env_path else {}
+        file_values = read_env_file(env_path) if env_path else {}
         base_url = os.getenv(f"{prefix}BASE_URL") or file_values.get(f"{prefix}BASE_URL")
         model = os.getenv(f"{prefix}MODEL") or file_values.get(f"{prefix}MODEL")
         if not base_url or not model:
@@ -43,7 +43,7 @@ class LLMConfig:
         )
 
 
-def _load_env_file(path: Path | None) -> dict[str, str]:
+def read_env_file(path: Path | None) -> dict[str, str]:
     if path is None or not path.exists():
         return {}
     values: dict[str, str] = {}
@@ -59,6 +59,14 @@ def _load_env_file(path: Path | None) -> dict[str, str]:
         if key:
             values[key] = value
     return values
+
+
+def upsert_env_value(path: Path, key: str, value: str) -> None:
+    values = read_env_file(path)
+    values[key] = value
+    lines = [f"{k}={v}" for k, v in sorted(values.items())]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def _parse_timeout(raw: str) -> int:

@@ -16,6 +16,7 @@ from cv_compiler.select.types import SelectionResult
 
 class RenderFormat(str, Enum):
     PDF = "pdf"
+    MARKDOWN = "md"
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,8 +26,11 @@ class RenderRequest:
     template_dir: Path
     output_path: Path
     format: RenderFormat = RenderFormat.PDF
+    markdown_path: Path | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class RenderResult:
     output_path: Path
+    markdown_path: Path
+    pdf_path: Path | None

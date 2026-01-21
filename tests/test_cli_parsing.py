@@ -27,3 +27,13 @@ class TestCliParsing(unittest.TestCase):
         parser = _build_parser()
         with self.assertRaises(SystemExit):
             parser.parse_args(["build", "--data", "data", "--example", "basic"])
+
+    def test_build_accepts_no_pdf_flag(self) -> None:
+        parser = _build_parser()
+        args = parser.parse_args(["build", "--no-pdf"])
+        self.assertTrue(args.no_pdf)
+
+    def test_build_accepts_from_markdown_flag(self) -> None:
+        parser = _build_parser()
+        args = parser.parse_args(["build", "--from-markdown", "out/cv_generic.md"])
+        self.assertEqual(args.from_markdown, "out/cv_generic.md")

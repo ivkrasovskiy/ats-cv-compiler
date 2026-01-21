@@ -15,7 +15,7 @@ from cv_compiler.lint.linter import lint_build_inputs, lint_rendered_output
 from cv_compiler.llm.base import BulletRewriteRequest, LLMProvider
 from cv_compiler.llm.experience import archive_user_experience_files, write_experience_artifacts
 from cv_compiler.parse.loaders import load_canonical_data, load_job_spec
-from cv_compiler.render.renderer import render_cv
+from cv_compiler.render.renderer import render_cv, render_markdown_to_pdf
 from cv_compiler.render.types import RenderFormat, RenderRequest
 from cv_compiler.schema.models import CanonicalData
 from cv_compiler.select.selector import select_content
@@ -32,11 +32,14 @@ class BuildRequest:
     llm: LLMProvider | None = None
     llm_instructions_path: Path | None = None
     experience_regenerate: bool = False
+    render_from_markdown: Path | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class BuildResult:
     output_path: Path
+    markdown_path: Path | None
+    pdf_path: Path | None
     issues: tuple[LintIssue, ...]
 
 
@@ -69,6 +72,30 @@ def build_cv(request: BuildRequest) -> BuildResult:
 
     The default behavior MUST be deterministic and MUST NOT require network access.
     """
+    if request.render_from_markdown is not None:
+        markdown_path = request.render_from_markdown
+        if not markdown_path.exists():
+            raise ValueError(f"Markdown source not found: {markdown_path}")
+        output_stem = _sanitize_stem(markdown_path.stem)
+        if request.format == RenderFormat.PDF:
+            output_path = request.out_dir / f"{output_stem}.pdf"
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            render_markdown_to_pdf(markdown_path.read_text(encoding="utf-8"), output_path)
+            issues = list(lint_rendered_output(output_path))
+            return BuildResult(
+                output_path=output_path,
+                markdown_path=markdown_path,
+                pdf_path=output_path,
+                issues=tuple(issues),
+            )
+        issues = list(lint_rendered_output(markdown_path))
+        return BuildResult(
+            output_path=markdown_path,
+            markdown_path=markdown_path,
+            pdf_path=None,
+            issues=tuple(issues),
+        )
+
     data = load_canonical_data(request.data_dir)
     issues: list[LintIssue] = list(lint_build_inputs(data))
 
@@ -106,7 +133,9 @@ def build_cv(request: BuildRequest) -> BuildResult:
             else f"cv_{_sanitize_stem(request.job_path.stem)}"
         )
         output_path = request.out_dir / f"{output_stem}.{request.format.value}"
-        return BuildResult(output_path=output_path, issues=tuple(issues))
+        return BuildResult(
+            output_path=output_path, markdown_path=None, pdf_path=None, issues=tuple(issues)
+        )
 
     if request.llm is not None:
         job_keywords = job.keywords if job is not None else ()
@@ -142,7 +171,12 @@ def build_cv(request: BuildRequest) -> BuildResult:
         )
     )
     issues.extend(lint_rendered_output(render_result.output_path))
-    return BuildResult(output_path=render_result.output_path, issues=tuple(issues))
+    return BuildResult(
+        output_path=render_result.output_path,
+        markdown_path=render_result.markdown_path,
+        pdf_path=render_result.pdf_path,
+        issues=tuple(issues),
+    )
 
 
 def _load_text_optional(path: Path | None) -> str | None:

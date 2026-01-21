@@ -73,8 +73,7 @@ def lint_build_inputs(data: CanonicalData) -> Sequence[LintIssue]:
                 )
                 break
 
-    for bullet in data.profile.summary:
-        lint_text(bullet, source_path=data.profile.source_path, field="profile.summary")
+    lint_text(data.profile.about_me, source_path=data.profile.source_path, field="profile.about_me")
 
     for e in data.experience:
         for bullet in e.bullets:
@@ -101,7 +100,8 @@ def lint_rendered_output(output_path: Path) -> Sequence[LintIssue]:
         )
         return tuple(issues)
 
-    if output_path.suffix.lower() != ".pdf":
+    ext = output_path.suffix.lower()
+    if ext not in {".pdf", ".md"}:
         issues.append(
             LintIssue(
                 code="OUTPUT_EXT",
