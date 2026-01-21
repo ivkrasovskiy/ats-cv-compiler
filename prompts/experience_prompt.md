@@ -5,6 +5,10 @@ STRICT RULES (NON-NEGOTIABLE):
 - Use only the facts explicitly present in the provided project data.
 - If a template requires a metric and the project data does not contain that metric, do NOT use that template.
 - Output must be concise and ATS-safe (single-column, plain text).
+- Fix grammar, spacing, and typos across all output fields (not just bullets).
+- Normalize punctuation (straight quotes, standard hyphens), remove doubled spaces, and fix missing
+  spaces around numbers/units (e.g., "by 3%", "at 10K RPM").
+- Preserve proper nouns and acronyms exactly; do not change meaning or tone.
 - Experience IDs must be deterministic: exp_<company>_<start>, where <company> and <start> are taken
   from project data (start is YYYY-MM). If multiple experiences share the same company+start, append
   _2, _3, etc.

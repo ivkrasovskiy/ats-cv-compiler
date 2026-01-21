@@ -85,3 +85,5 @@ class TestPdfIngest(unittest.TestCase):
             self.assertTrue(result.written_paths)
             profile_doc = parse_markdown_frontmatter(data_dir / "profile.md")
             self.assertEqual(profile_doc.frontmatter["name"], "Jane Doe")
+            exp_files = list((data_dir / "experience").glob("user_*.md"))
+            self.assertEqual(len(exp_files), 1)

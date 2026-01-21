@@ -27,7 +27,12 @@ from cv_compiler.llm.openai import (
     experience_response_schema,
     extract_chat_content,
 )
-from cv_compiler.schema.models import JobSpec, ProjectEntry
+from cv_compiler.llm.skills import (
+    build_skills_prompt,
+    parse_skill_highlights,
+    skills_highlight_schema,
+)
+from cv_compiler.schema.models import JobSpec, Profile, ProjectEntry
 
 
 class ManualProvider(LLMProvider):
@@ -38,17 +43,23 @@ class ManualProvider(LLMProvider):
         *,
         request_path: Path,
         response_path: Path,
+        skills_request_path: Path,
+        skills_response_path: Path,
         model: str = "manual",
         base_url: str | None = None,
         prompt_path: Path = Path("prompts/experience_prompt.md"),
         templates_path: Path = Path("prompts/experience_templates.yaml"),
+        skills_prompt_path: Path = Path("prompts/skills_highlight_prompt.md"),
     ) -> None:
         self._request_path = request_path
         self._response_path = response_path
+        self._skills_request_path = skills_request_path
+        self._skills_response_path = skills_response_path
         self._model = model
         self._base_url = base_url
         self._prompt_path = prompt_path
         self._templates_path = templates_path
+        self._skills_prompt_path = skills_prompt_path
 
     def rewrite_bullets(
         self,
@@ -88,6 +99,37 @@ class ManualProvider(LLMProvider):
         raw = self._response_path.read_text(encoding="utf-8")
         content = _extract_response_content(raw)
         return parse_experience_drafts(content)
+
+    def highlight_skills(
+        self,
+        skills: Sequence[str],
+        profile: Profile,
+        job: JobSpec | None,
+    ) -> Sequence[str]:
+        prompt = build_skills_prompt(
+            self._skills_prompt_path,
+            skills=tuple(skills),
+            profile=profile,
+            job=job,
+        )
+        payload = build_chat_payload(self._model, prompt, skills_highlight_schema())
+        request_bundle = {"payload": payload}
+        if self._base_url:
+            request_bundle["endpoint"] = build_chat_endpoint(self._base_url)
+        self._skills_request_path.parent.mkdir(parents=True, exist_ok=True)
+        self._skills_request_path.write_text(
+            json.dumps(request_bundle, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+
+        if not self._skills_response_path.exists():
+            raise ValueError(
+                "Manual LLM mode: response file missing. "
+                f"Paste model output into {self._skills_response_path} and retry."
+            )
+        raw = self._skills_response_path.read_text(encoding="utf-8")
+        content = _extract_response_content(raw)
+        return parse_skill_highlights(content, allowed_skills=tuple(skills))
 
 
 def _extract_response_content(raw: str) -> str:

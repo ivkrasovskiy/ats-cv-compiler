@@ -27,6 +27,7 @@ class RenderRequest:
     output_path: Path
     format: RenderFormat = RenderFormat.PDF
     markdown_path: Path | None = None
+    highlighted_skills: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

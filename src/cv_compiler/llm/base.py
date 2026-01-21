@@ -11,7 +11,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Protocol
 
-from cv_compiler.schema.models import JobSpec, ProjectEntry
+from cv_compiler.schema.models import JobSpec, Profile, ProjectEntry
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,6 +56,13 @@ class LLMProvider(Protocol):
         job: JobSpec | None,
     ) -> Sequence[ExperienceDraft]: ...
 
+    def highlight_skills(
+        self,
+        skills: Sequence[str],
+        profile: Profile,
+        job: JobSpec | None,
+    ) -> Sequence[str]: ...
+
 
 @dataclass(frozen=True, slots=True)
 class NoopProvider:
@@ -75,4 +82,13 @@ class NoopProvider:
         job: JobSpec | None,
     ) -> Sequence[ExperienceDraft]:
         _ = (projects, job)
+        return []
+
+    def highlight_skills(
+        self,
+        skills: Sequence[str],
+        profile: Profile,
+        job: JobSpec | None,
+    ) -> Sequence[str]:
+        _ = (skills, profile, job)
         return []

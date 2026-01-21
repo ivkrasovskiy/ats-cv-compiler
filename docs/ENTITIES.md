@@ -38,13 +38,16 @@ Notes:
   - `name: str`
   - `rewrite_bullets(items: Sequence[BulletRewriteRequest], instructions: str | None) -> Sequence[BulletRewriteResult]`
   - `generate_experience(projects: Sequence[ProjectEntry], job: JobSpec | None) -> Sequence[ExperienceDraft]`
+  - `highlight_skills(skills: Sequence[str], profile: Profile, job: JobSpec | None) -> Sequence[str]`
 - `BulletRewriteRequest(item_id: str, bullets: tuple[str, ...], job_keywords: tuple[str, ...])`
 - `BulletRewriteResult(item_id: str, bullets: tuple[str, ...])`
 - `ExperienceDraft(id: str, role: str | None, bullets: tuple[str, ...], source_project_ids: tuple[str, ...])`
 - `LLMConfig(base_url: str, model: str, api_key: str | None = None, timeout_seconds: int = 300)` (`src/cv_compiler/llm/config.py`)
   - `from_env(prefix: str = "CV_LLM_", env_path: Path | None = Path("config/llm.env")) -> LLMConfig | None`
 - `OpenAIProvider(config: LLMConfig, prompt_path: Path, templates_path: Path)` (`src/cv_compiler/llm/openai.py`)
-- `ManualProvider(request_path: Path, response_path: Path, model: str = "manual", base_url: str | None = None, prompt_path: Path, templates_path: Path)` (`src/cv_compiler/llm/manual.py`)
+- `ManualProvider(request_path: Path, response_path: Path, skills_request_path: Path, skills_response_path: Path, model: str = "manual", base_url: str | None = None, prompt_path: Path, templates_path: Path)` (`src/cv_compiler/llm/manual.py`)
+- `build_skills_prompt(prompt_path: Path, skills: tuple[str, ...], profile: Profile, job: JobSpec | None) -> str` (`src/cv_compiler/llm/skills.py`)
+- `parse_skill_highlights(text: str, allowed_skills: tuple[str, ...]) -> tuple[str, ...]` (`src/cv_compiler/llm/skills.py`)
 
 ## Ingestion (`src/cv_compiler/ingest/*`)
 
@@ -58,7 +61,7 @@ Notes:
 - `RenderFormat` enum (`src/cv_compiler/render/types.py`)
   - `RenderFormat.PDF`
   - `RenderFormat.MARKDOWN`
-- `RenderRequest(data: CanonicalData, selection: SelectionResult, template_dir: Path, output_path: Path, format: RenderFormat = RenderFormat.PDF, markdown_path: Path | None = None)`
+- `RenderRequest(data: CanonicalData, selection: SelectionResult, template_dir: Path, output_path: Path, format: RenderFormat = RenderFormat.PDF, markdown_path: Path | None = None, highlighted_skills: tuple[str, ...] = ())`
 - `RenderResult(output_path: Path, markdown_path: Path, pdf_path: Path | None)`
 - `build_markdown(data: CanonicalData, selection: SelectionResult) -> str` (`src/cv_compiler/render/markdown.py`)
 - `render_cv(request: RenderRequest) -> RenderResult` (`src/cv_compiler/render/renderer.py`)

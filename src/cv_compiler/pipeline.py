@@ -101,6 +101,7 @@ def build_cv(request: BuildRequest) -> BuildResult:
 
     job = load_job_spec(request.job_path) if request.job_path else None
 
+    highlighted_skills: tuple[str, ...] = ()
     if request.llm is not None:
         try:
             if request.experience_regenerate:
@@ -118,6 +119,21 @@ def build_cv(request: BuildRequest) -> BuildResult:
             issues.append(
                 LintIssue(
                     code="LLM_GENERATION_FAILED",
+                    message=str(exc),
+                    severity=Severity.WARNING,
+                    source_path=None,
+                )
+            )
+        try:
+            all_skills = tuple(item for cat in data.skills.categories for item in cat.items)
+            if all_skills:
+                highlighted_skills = tuple(
+                    request.llm.highlight_skills(all_skills, data.profile, job)
+                )
+        except Exception as exc:  # noqa: BLE001
+            issues.append(
+                LintIssue(
+                    code="LLM_SKILL_HIGHLIGHT_FAILED",
                     message=str(exc),
                     severity=Severity.WARNING,
                     source_path=None,
@@ -168,6 +184,7 @@ def build_cv(request: BuildRequest) -> BuildResult:
             template_dir=request.template_dir,
             output_path=output_path,
             format=request.format,
+            highlighted_skills=highlighted_skills,
         )
     )
     issues.extend(lint_rendered_output(render_result.output_path))

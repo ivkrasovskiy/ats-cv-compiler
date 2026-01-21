@@ -16,6 +16,7 @@ from urllib.request import Request, urlopen
 import yaml
 
 from cv_compiler.llm.config import LLMConfig
+from cv_compiler.llm.experience import USER_PREFIX
 from cv_compiler.llm.openai import build_chat_endpoint, build_chat_payload, extract_chat_content
 
 _SAFE_ID_RE = re.compile(r"[^a-z0-9_]+")
@@ -255,7 +256,7 @@ def write_ingest_files(data_dir: Path, parsed: ParsedCv, *, overwrite: bool) -> 
             _slugify(f"exp_{entry.company or 'unknown'}_{entry.start_date or idx}"), used_ids
         )
         used_ids.add(exp_id)
-        exp_path = experience_dir / f"{exp_id}.md"
+        exp_path = experience_dir / f"{USER_PREFIX}{exp_id}.md"
         _ensure_writable(exp_path, overwrite=overwrite)
         exp_frontmatter = {
             "id": exp_id,

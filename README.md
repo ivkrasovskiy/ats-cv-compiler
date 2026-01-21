@@ -40,6 +40,7 @@ Optional:
 Profile field change:
 - `profile.md` now uses `about_me` (string paragraph) instead of `summary` (bullet list).
  - Links with missing URLs are skipped with a warning.
+ - Output Markdown/PDF normalize Unicode punctuation to ASCII for ATS-safe rendering.
 
 ## LLM (optional, not required)
 
@@ -47,6 +48,7 @@ The default build is deterministic and does not require any LLM.
 
 When enabled, the LLM is used only for constrained derivation of experience bullets from projects
 (never as a source of truth).
+It can also highlight a few key skills from your existing skills list.
 
 Planned configuration (via environment variables):
 - `CV_LLM_MODE`: `api` (endpoint) or `offline` (manual copy/paste)
@@ -80,10 +82,12 @@ Manual/offline LLM mode:
   `out/llm_response.json`. Paste the model response (raw YAML/JSON or full OpenAI-style JSON)
   into the response file and re-run the build.
 - If `CV_LLM_MODE` is not set, the CLI prompts once and stores it in `config/llm.env`.
+ - Skill highlighting uses `out/llm_skills_request.json` and `out/llm_skills_response.json`.
 
 Manual/offline PDF ingestion:
 - `cv to_mds_from_pdf` writes `data/llm_ingest_request.json` and expects
   `data/llm_ingest_response.json` when `CV_LLM_MODE=offline`.
+- Ingested experiences are written as `data/experience/user_<id>.md`.
 
 Project requirements for LLM:
 - Projects should include `company`, `role`, `start_date`, and optional `end_date` in frontmatter.

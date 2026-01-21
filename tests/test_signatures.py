@@ -74,3 +74,4 @@ class TestSignatures(unittest.TestCase):
     def test_llm_provider_protocol_shape(self) -> None:
         self.assertTrue(hasattr(LLMProvider, "rewrite_bullets"))
         self.assertTrue(hasattr(LLMProvider, "generate_experience"))
+        self.assertTrue(hasattr(LLMProvider, "highlight_skills"))

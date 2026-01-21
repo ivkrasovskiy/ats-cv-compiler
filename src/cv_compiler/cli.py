@@ -251,6 +251,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                         llm = ManualProvider(
                             request_path=out_dir / "llm_request.json",
                             response_path=out_dir / "llm_response.json",
+                            skills_request_path=out_dir / "llm_skills_request.json",
+                            skills_response_path=out_dir / "llm_skills_response.json",
                             model=model,
                             base_url=base_url,
                         )

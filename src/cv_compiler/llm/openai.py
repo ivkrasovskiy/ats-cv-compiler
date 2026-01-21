@@ -24,7 +24,12 @@ from cv_compiler.llm.experience import (
     load_experience_templates,
     parse_experience_drafts,
 )
-from cv_compiler.schema.models import JobSpec, ProjectEntry
+from cv_compiler.llm.skills import (
+    build_skills_prompt,
+    parse_skill_highlights,
+    skills_highlight_schema,
+)
+from cv_compiler.schema.models import JobSpec, Profile, ProjectEntry
 
 
 class OpenAIProvider(LLMProvider):
@@ -36,10 +41,12 @@ class OpenAIProvider(LLMProvider):
         *,
         prompt_path: Path = Path("prompts/experience_prompt.md"),
         templates_path: Path = Path("prompts/experience_templates.yaml"),
+        skills_prompt_path: Path = Path("prompts/skills_highlight_prompt.md"),
     ) -> None:
         self._config = config
         self._prompt_path = prompt_path
         self._templates_path = templates_path
+        self._skills_prompt_path = skills_prompt_path
 
     def rewrite_bullets(
         self,
@@ -67,6 +74,25 @@ class OpenAIProvider(LLMProvider):
             response_format=experience_response_schema(),
         )
         return parse_experience_drafts(content)
+
+    def highlight_skills(
+        self,
+        skills: Sequence[str],
+        profile: Profile,
+        job: JobSpec | None,
+    ) -> Sequence[str]:
+        prompt = build_skills_prompt(
+            self._skills_prompt_path,
+            skills=tuple(skills),
+            profile=profile,
+            job=job,
+        )
+        content = request_chat_completion(
+            self._config,
+            prompt,
+            response_format=skills_highlight_schema(),
+        )
+        return parse_skill_highlights(content, allowed_skills=tuple(skills))
 
 
 def request_chat_completion(

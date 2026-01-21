@@ -39,6 +39,8 @@ class TestManualProvider(unittest.TestCase):
             provider = ManualProvider(
                 request_path=request_path,
                 response_path=response_path,
+                skills_request_path=tmp_dir / "llm_skills_request.json",
+                skills_response_path=tmp_dir / "llm_skills_response.json",
                 model="manual",
                 prompt_path=prompt_path,
                 templates_path=templates_path,
@@ -70,6 +72,8 @@ class TestManualProvider(unittest.TestCase):
             provider = ManualProvider(
                 request_path=tmp_dir / "llm_request.json",
                 response_path=tmp_dir / "llm_response.json",
+                skills_request_path=tmp_dir / "llm_skills_request.json",
+                skills_response_path=tmp_dir / "llm_skills_response.json",
                 model="manual",
                 prompt_path=prompt_path,
                 templates_path=templates_path,
