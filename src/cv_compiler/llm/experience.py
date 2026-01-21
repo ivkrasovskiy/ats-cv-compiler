@@ -7,6 +7,7 @@ This module builds prompts, validates LLM responses, and writes generated experi
 from __future__ import annotations
 
 import re
+import shutil
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -23,6 +24,7 @@ USER_PREFIX = "user_"
 _NUM_TOKEN_RE = re.compile(r"\d+(?:\.\d+)?%?")
 _SAFE_ID_RE = re.compile(r"[^a-z0-9_]+")
 _ACTIVE_USER_RE = re.compile(r"^user_[a-z0-9_]+$")
+_ACTIVE_LLM_RE = re.compile(r"^llm_[a-z0-9_]+$")
 _THINK_RE = re.compile(r"<think>.*?</think>", re.S)
 _YAML_START_RE = re.compile(r"(?m)^\s*experiences\s*:\s*$")
 
@@ -218,6 +220,37 @@ def archive_user_experience_files(data_dir: Path) -> tuple[Path, ...]:
         path.rename(dest)
         archived.append(dest)
     return tuple(archived)
+
+
+def backup_llm_experience_files(data_dir: Path) -> Path | None:
+    experience_dir = data_dir / "experience"
+    if not experience_dir.exists():
+        return None
+    candidates = [
+        path for path in experience_dir.glob("*.md") if _ACTIVE_LLM_RE.match(path.stem)
+    ]
+    if not candidates:
+        return None
+    backup_root = data_dir.parent / "tmp"
+    backup_root.mkdir(parents=True, exist_ok=True)
+    backup_dir = backup_root / f"llm_experience_backup_{int(time.time())}"
+    backup_dir.mkdir(parents=True, exist_ok=False)
+    for path in candidates:
+        shutil.move(path, backup_dir / path.name)
+    return backup_dir
+
+
+def restore_llm_experience_files(backup_dir: Path, data_dir: Path) -> None:
+    if not backup_dir.exists():
+        return
+    experience_dir = data_dir / "experience"
+    experience_dir.mkdir(parents=True, exist_ok=True)
+    for path in backup_dir.glob("*.md"):
+        dest = experience_dir / path.name
+        if dest.exists():
+            dest.unlink()
+        shutil.move(path, dest)
+    shutil.rmtree(backup_dir, ignore_errors=True)
 
 
 def _collect_allowed_numbers(projects: tuple[ProjectEntry, ...]) -> set[str]:

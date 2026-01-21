@@ -8,12 +8,18 @@ Default behavior must remain deterministic; the pipeline implementation is curre
 from __future__ import annotations
 
 import dataclasses
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
 from cv_compiler.lint.linter import lint_build_inputs, lint_rendered_output
 from cv_compiler.llm.base import BulletRewriteRequest, LLMProvider
-from cv_compiler.llm.experience import archive_user_experience_files, write_experience_artifacts
+from cv_compiler.llm.experience import (
+    archive_user_experience_files,
+    backup_llm_experience_files,
+    restore_llm_experience_files,
+    write_experience_artifacts,
+)
 from cv_compiler.parse.loaders import load_canonical_data, load_job_spec
 from cv_compiler.render.renderer import render_cv, render_markdown_to_pdf
 from cv_compiler.render.types import RenderFormat, RenderRequest
@@ -108,11 +114,19 @@ def build_cv(request: BuildRequest) -> BuildResult:
                 archive_user_experience_files(request.data_dir)
             drafts = request.llm.generate_experience(data.projects, job)
             if drafts:
-                write_experience_artifacts(
-                    request.data_dir,
-                    projects=tuple(data.projects),
-                    drafts=tuple(drafts),
-                )
+                backup_dir = backup_llm_experience_files(request.data_dir)
+                try:
+                    write_experience_artifacts(
+                        request.data_dir,
+                        projects=tuple(data.projects),
+                        drafts=tuple(drafts),
+                    )
+                except Exception:
+                    if backup_dir is not None:
+                        restore_llm_experience_files(backup_dir, request.data_dir)
+                    raise
+                if backup_dir is not None:
+                    shutil.rmtree(backup_dir, ignore_errors=True)
                 data = load_canonical_data(request.data_dir)
                 issues = list(lint_build_inputs(data))
         except Exception as exc:  # noqa: BLE001
