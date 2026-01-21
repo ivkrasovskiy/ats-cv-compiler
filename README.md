@@ -33,6 +33,8 @@ Place your PDF at `data/cv.pdf` (or pass `--pdf`) and run:
 - `uv run cv to_mds_from_pdf`
 
 This writes canonical Markdown files into `data/` so you can edit and then run `cv build`.
+With `--overwrite`, existing canonical files are moved to `tmp/ingest_backup_<timestamp>` first.
+If ingestion succeeds the backup is removed; on failure it is restored.
 
 Optional:
 - `uv run cv build --example basic --job examples/basic/jobs/backend_engineer.md`

@@ -87,3 +87,50 @@ class TestPdfIngest(unittest.TestCase):
             self.assertEqual(profile_doc.frontmatter["name"], "Jane Doe")
             proj_files = list((data_dir / "projects").glob("*.md"))
             self.assertEqual(len(proj_files), 1)
+
+    def test_write_ingest_files_overwrite_removes_old(self) -> None:
+        profile = ParsedProfile(
+            name="Jane Doe",
+            headline="Engineer",
+            location="Remote",
+            email="jane@example.com",
+            about_me="Builds reliable systems.",
+            links=(),
+        )
+        experience = (
+            ParsedExperience(
+                company="Acme",
+                title="Developer",
+                location=None,
+                start_date="2022-01",
+                end_date=None,
+                bullets=("Did a thing.",),
+                tags=("python",),
+            ),
+        )
+        skills = (ParsedSkillCategory(name="Languages", items=("Python",)),)
+        parsed = ParsedCv(
+            profile=profile,
+            experience=experience,
+            projects=(),
+            skills=skills,
+            education=(),
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            data_dir = Path(tmp) / "data"
+            data_dir.mkdir()
+            projects_dir = data_dir / "projects"
+            projects_dir.mkdir(parents=True, exist_ok=True)
+            old_path = projects_dir / "old.md"
+            old_path.write_text("old", encoding="utf-8")
+
+            write_ingest_files(data_dir, parsed, overwrite=True)
+
+            self.assertFalse(old_path.exists())
+            proj_files = list(projects_dir.glob("*.md"))
+            self.assertEqual(len(proj_files), 1)
+            backup_root = data_dir.parent / "tmp"
+            if backup_root.exists():
+                backups = list(backup_root.glob("ingest_backup_*"))
+                self.assertEqual(backups, [])
