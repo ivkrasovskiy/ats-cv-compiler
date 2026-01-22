@@ -39,6 +39,9 @@ If ingestion succeeds the backup is removed; on failure it is restored.
 Optional:
 - `uv run cv build --example basic --job examples/basic/jobs/backend_engineer.md`
 
+Project file validation (useful if `cv build` fails due to a single bad project file):
+- `uv run python scripts/check_projects.py --data data`
+
 Profile field change:
 - `profile.md` now uses `about_me` (string paragraph) instead of `summary` (bullet list).
  - Links with missing URLs are skipped with a warning.
