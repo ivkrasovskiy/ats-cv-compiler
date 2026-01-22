@@ -83,9 +83,9 @@ def build_markdown(
 
     def add_section(title: str) -> None:
         if lines:
-            add_blank()
+            while lines and lines[-1] == "":
+                lines.pop()
             add_line("---")
-            add_blank()
         add_line(f"## {title}")
 
     add_line(f"# {data.profile.name}")

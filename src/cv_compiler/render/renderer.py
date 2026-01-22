@@ -94,7 +94,7 @@ def render_markdown_to_pdf(markdown: str, output_path: Path) -> None:
         if line == "---":
             y = pdf.get_y() + 1
             pdf.line(pdf.l_margin, y, pdf.w - pdf.r_margin, y)
-            pdf.ln(4)
+            pdf.ln(2)
             continue
 
         if line.startswith("## "):
