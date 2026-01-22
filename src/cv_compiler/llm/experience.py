@@ -132,6 +132,7 @@ def write_experience_artifacts(
     *,
     projects: tuple[ProjectEntry, ...],
     drafts: tuple[ExperienceDraft, ...],
+    warnings: list[str] | None = None,
 ) -> tuple[Path, ...]:
     if len(drafts) > 5:
         raise ValueError("LLM must produce at most 5 experiences")
@@ -144,6 +145,7 @@ def write_experience_artifacts(
 
     used_ids: set[str] = set()
     written: list[Path] = []
+    warning_sink: list[str] = warnings if warnings is not None else []
     for draft in drafts:
         if not draft.source_project_ids:
             raise ValueError(f"Experience {draft.id} has no source_project_ids")
@@ -176,7 +178,10 @@ def write_experience_artifacts(
             raise ValueError(f"Experience {draft.id} needs a role from project data")
 
         tags = sorted({t for p in src_projects for t in p.tags})
-        bullets = tuple(_validate_bullet_numbers(b, allowed_numbers) for b in draft.bullets[:3])
+        bullets = tuple(
+            _validate_bullet_numbers(b, allowed_numbers, warnings=warning_sink)
+            for b in draft.bullets[:3]
+        )
         exp_id = _derive_experience_id(company, start_date, used_ids)
 
         frontmatter = {
@@ -271,10 +276,15 @@ def _collect_allowed_numbers(projects: tuple[ProjectEntry, ...]) -> set[str]:
     return tokens
 
 
-def _validate_bullet_numbers(bullet: str, allowed_numbers: set[str]) -> str:
+def _validate_bullet_numbers(
+    bullet: str,
+    allowed_numbers: set[str],
+    *,
+    warnings: list[str],
+) -> str:
     for token in _NUM_TOKEN_RE.findall(bullet):
         if token not in allowed_numbers:
-            raise ValueError(f"Unknown numeric token {token!r} in bullet: {bullet}")
+            warnings.append(f"Unknown numeric token {token!r} in bullet: {bullet}")
     return bullet
 
 

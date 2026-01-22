@@ -12,6 +12,7 @@ STRICT RULES (NON-NEGOTIABLE):
 - Experience IDs must be deterministic: exp_<company>_<start>, where <company> and <start> are taken
   from project data (start is YYYY-MM). If multiple experiences share the same company+start, append
   _2, _3, etc.
+- Do NOT mention durations (months/years/quarters) unless the exact duration appears in project data.
 
 TASK:
 Derive a structured Experience section from the provided projects. Each experience must:

@@ -22,7 +22,7 @@ from cv_compiler.parse.loaders import load_canonical_data, load_job_spec
 from cv_compiler.pipeline import BuildRequest, build_cv
 from cv_compiler.render.types import RenderFormat
 from cv_compiler.select.selector import select_content
-from cv_compiler.types import Severity
+from cv_compiler.types import LintIssue, Severity
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -70,6 +70,11 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Render PDF from an existing Markdown file instead of parsing data.",
     )
+    build.add_argument(
+        "--debug",
+        action="store_true",
+        help="Show debug-only warnings (e.g., non-ASCII characters).",
+    )
 
     lint = sub.add_parser("lint", help="Validate schema and enforce ATS constraints.")
     lint_inputs = lint.add_mutually_exclusive_group()
@@ -78,6 +83,11 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     lint_inputs.add_argument(
         "--example", type=str, default=None, help="Use a bundled example dataset by name."
+    )
+    lint.add_argument(
+        "--debug",
+        action="store_true",
+        help="Show debug-only warnings (e.g., non-ASCII characters).",
     )
 
     explain = sub.add_parser("explain", help="Explain deterministic selection decisions.")
@@ -133,6 +143,17 @@ def _normalize_llm_mode(value: str | None) -> str | None:
     if normalized in {"api", "offline"}:
         return normalized
     return None
+
+
+def _filter_warnings(
+    issues: Sequence[LintIssue],
+    *,
+    debug: bool,
+) -> tuple[LintIssue, ...]:
+    if debug:
+        return tuple(issues)
+    suppressed = {"UNICODE_NON_ASCII"}
+    return tuple(issue for issue in issues if issue.code not in suppressed)
 
 
 def _prompt_llm_mode(env_path: Path) -> str:
@@ -281,7 +302,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 return 1
 
             errors = [i for i in result.issues if i.severity == Severity.ERROR]
-            for issue in result.issues:
+            display_issues = _filter_warnings(result.issues, debug=args.debug)
+            for issue in display_issues:
                 where = f" ({issue.source_path})" if issue.source_path else ""
                 print(
                     f"{issue.severity.value.upper()} {issue.code}: {issue.message}{where}",
@@ -308,7 +330,8 @@ def main(argv: Sequence[str] | None = None) -> int:
 
             issues = lint_build_inputs(data)
             errors = [i for i in issues if i.severity == Severity.ERROR]
-            for issue in issues:
+            display_issues = _filter_warnings(issues, debug=args.debug)
+            for issue in display_issues:
                 where = f" ({issue.source_path})" if issue.source_path else ""
                 print(
                     f"{issue.severity.value.upper()} {issue.code}: {issue.message}{where}",

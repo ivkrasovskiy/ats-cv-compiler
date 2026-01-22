@@ -114,12 +114,14 @@ def build_cv(request: BuildRequest) -> BuildResult:
                 archive_user_experience_files(request.data_dir)
             drafts = request.llm.generate_experience(data.projects, job)
             if drafts:
+                bullet_warnings: list[str] = []
                 backup_dir = backup_llm_experience_files(request.data_dir)
                 try:
                     write_experience_artifacts(
                         request.data_dir,
                         projects=tuple(data.projects),
                         drafts=tuple(drafts),
+                        warnings=bullet_warnings,
                     )
                 except Exception:
                     if backup_dir is not None:
@@ -129,6 +131,15 @@ def build_cv(request: BuildRequest) -> BuildResult:
                     shutil.rmtree(backup_dir, ignore_errors=True)
                 data = load_canonical_data(request.data_dir)
                 issues = list(lint_build_inputs(data))
+                for warning in bullet_warnings:
+                    issues.append(
+                        LintIssue(
+                            code="LLM_BULLET_NUMBER_WARNING",
+                            message=warning,
+                            severity=Severity.WARNING,
+                            source_path=None,
+                        )
+                    )
         except Exception as exc:  # noqa: BLE001
             issues.append(
                 LintIssue(
