@@ -11,7 +11,7 @@ This document describes the public-ish entities we expect in the MVP, focusing o
 - `SkillsCategory(name: str, items: tuple[str, ...])`
 - `Skills(id: str, categories: tuple[SkillsCategory, ...], source_path: Path | None = None)`
 - `EducationEntry(institution: str, degree: str, location: str | None, start_date: str | None, end_date: str | None)`
-- `Education(id: str, entries: tuple[EducationEntry, ...], source_path: Path | None = None)`
+- `Education(id: str, entries: tuple[EducationEntry, ...], languages: tuple[str, ...], source_path: Path | None = None)`
 - `CanonicalData(profile: Profile, experience: tuple[ExperienceEntry, ...], projects: tuple[ProjectEntry, ...], skills: Skills, education: Education | None)`
 - `JobSpec(id: str, title: str | None, raw_text: str, keywords: tuple[str, ...], source_path: Path | None = None)`
 

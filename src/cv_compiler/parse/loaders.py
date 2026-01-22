@@ -84,6 +84,24 @@ def _require_list_of_str(
     return tuple(items)
 
 
+def _optional_list_of_str(
+    frontmatter: Mapping[str, Any], key: str, *, source: Path
+) -> tuple[str, ...]:
+    value = frontmatter.get(key)
+    if value is None:
+        return ()
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
+        raise ValueError(f"Invalid `{key}` list in {source}")
+    items: list[str] = []
+    for item in value:
+        if not isinstance(item, str):
+            raise ValueError(f"Invalid `{key}` item in {source}")
+        s = item.strip()
+        if s:
+            items.append(s)
+    return tuple(items)
+
+
 def _require_list_of_mapping(
     frontmatter: Mapping[str, Any], key: str, *, source: Path
 ) -> tuple[Mapping[str, Any], ...]:
@@ -196,6 +214,7 @@ def _load_education(path: Path) -> Education:
     fm = doc.frontmatter
     edu_id = _require_str(fm, "id", source=path)
     entry_items = _require_list_of_mapping(fm, "entries", source=path)
+    languages = _optional_list_of_str(fm, "languages", source=path)
     entries: list[EducationEntry] = []
     for item in entry_items:
         institution = _require_str(item, "institution", source=path)
@@ -212,7 +231,12 @@ def _load_education(path: Path) -> Education:
                 end_date=end_date,
             )
         )
-    return Education(id=edu_id, entries=tuple(entries), source_path=path)
+    return Education(
+        id=edu_id,
+        entries=tuple(entries),
+        languages=languages,
+        source_path=path,
+    )
 
 
 def load_canonical_data(data_dir: Path) -> CanonicalData:

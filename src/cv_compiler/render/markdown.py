@@ -140,8 +140,8 @@ def build_markdown(
         items = ", ".join(formatted_items)
         add_line(f"**{category.name}**: {items}")
 
-    if data.education and data.education.entries:
-        add_section("Education")
+    if data.education and (data.education.entries or data.education.languages):
+        add_section("Education and Languages")
         for entry in data.education.entries:
             start = entry.start_date or ""
             end = entry.end_date or ""
@@ -151,6 +151,9 @@ def build_markdown(
             if dates:
                 line = f"{line} | {dates}"
             add_line(f"- {line}")
+        if data.education.languages:
+            languages = ", ".join(data.education.languages)
+            add_line(f"- Languages: {languages}")
 
     while lines and lines[-1] == "":
         lines.pop()

@@ -6,5 +6,8 @@ entries:
     location: "Remote"
     start_date: "2017-09"
     end_date: "2021-06"
+languages:
+  - "English - Advanced"
+  - "Russian - Native"
+  - "Spanish - Beginner"
 ---
-

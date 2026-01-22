@@ -81,6 +81,7 @@ class EducationEntry:
 class Education:
     id: str
     entries: tuple[EducationEntry, ...]
+    languages: tuple[str, ...]
     source_path: Path | None = None
 
 

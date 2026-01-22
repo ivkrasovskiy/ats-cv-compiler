@@ -46,7 +46,7 @@ class TestMarkdownNormalization(unittest.TestCase):
             experience=(experience,),
             projects=(),
             skills=skills,
-            education=Education(id="education", entries=()),
+            education=Education(id="education", entries=(), languages=()),
         )
         selection = SelectionResult(
             selected_experience_ids=("exp_1",),
@@ -88,7 +88,7 @@ class TestMarkdownNormalization(unittest.TestCase):
             experience=(experience,),
             projects=(),
             skills=skills,
-            education=Education(id="education", entries=()),
+            education=Education(id="education", entries=(), languages=()),
         )
         selection = SelectionResult(
             selected_experience_ids=("exp_1",),
