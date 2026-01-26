@@ -24,15 +24,15 @@ from cv_compiler.llm.experience import (
     load_experience_templates,
     parse_experience_drafts,
 )
-from cv_compiler.llm.summary import (
-    build_experience_summary_prompt,
-    experience_summary_schema,
-    parse_experience_summary,
-)
 from cv_compiler.llm.skills import (
     build_skills_prompt,
     parse_skill_highlights,
     skills_highlight_schema,
+)
+from cv_compiler.llm.summary import (
+    build_experience_summary_prompt,
+    experience_summary_schema,
+    parse_experience_summary,
 )
 from cv_compiler.schema.models import JobSpec, Profile, ProjectEntry
 
