@@ -206,6 +206,9 @@ data/*
 
 # Temporary working artifacts
 tmp/
+jobs/*
+!jobs/README.md
+.DS_Store
 
 # Local LLM config
 config/llm.env

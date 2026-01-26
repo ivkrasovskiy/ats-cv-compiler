@@ -25,6 +25,8 @@ It supports:
 - `uv run cv build --example basic`
 - `uv run cv build --example basic --no-pdf` (Markdown only)
 - `uv run cv build --example basic --from-markdown examples/basic/out/cv_generic.md`
+- `uv run cv build` (builds one CV per `jobs/*.md` when present)
+- `uv run cv build --job false` (force a generic CV even if jobs exist)
 
 ## Import from PDF
 

@@ -43,7 +43,13 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Use a bundled example dataset by name (e.g. basic).",
     )
     build.add_argument(
-        "--job", type=str, default=None, help="Path to a job description (e.g. jobs/acme.md)."
+        "--job",
+        type=str,
+        default=None,
+        help=(
+            "Path to a job description (e.g. jobs/acme.md). "
+            "Use --job false to force a generic CV."
+        ),
     )
     build.add_argument(
         "--llm",
@@ -145,6 +151,23 @@ def _normalize_llm_mode(value: str | None) -> str | None:
     return None
 
 
+def _resolve_job_paths(
+    job_arg: str | None,
+    *,
+    jobs_dir: Path = Path("jobs"),
+) -> tuple[Path | None, ...]:
+    if job_arg:
+        normalized = job_arg.strip().lower()
+        if normalized in {"false", "none", "no"}:
+            return (None,)
+        return (Path(job_arg),)
+    if jobs_dir.exists():
+        job_paths = sorted(jobs_dir.glob("*.md"))
+        if job_paths:
+            return tuple(job_paths)
+    return (None,)
+
+
 def _filter_warnings(
     issues: Sequence[LintIssue],
     *,
@@ -206,7 +229,6 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
             template_dir = example_root / "templates" if example_root else Path("templates")
             out_dir = example_root / "out" if example_root else Path("out")
-            job_path = Path(args.job) if args.job else None
             render_format = RenderFormat.MARKDOWN if args.no_pdf else RenderFormat.PDF
 
             if args.from_markdown:
@@ -284,36 +306,45 @@ def main(argv: Sequence[str] | None = None) -> int:
                     )
                     return 2
 
-            try:
-                result = build_cv(
-                    BuildRequest(
-                        data_dir=data_dir,
-                        job_path=job_path,
-                        template_dir=template_dir,
-                        out_dir=out_dir,
-                        format=render_format,
-                        llm=llm,
-                        llm_instructions_path=None,
-                        experience_regenerate=args.experience_regenerate,
+            job_paths = _resolve_job_paths(args.job)
+            all_outputs: list[Path] = []
+            had_errors = False
+            for job_path in job_paths:
+                try:
+                    result = build_cv(
+                        BuildRequest(
+                            data_dir=data_dir,
+                            job_path=job_path,
+                            template_dir=template_dir,
+                            out_dir=out_dir,
+                            format=render_format,
+                            llm=llm,
+                            llm_instructions_path=None,
+                            experience_regenerate=args.experience_regenerate,
+                        )
                     )
-                )
-            except NotImplementedError as e:
-                print(f"Build failed: {e}", file=sys.stderr)
-                return 1
+                except NotImplementedError as e:
+                    print(f"Build failed: {e}", file=sys.stderr)
+                    had_errors = True
+                    continue
 
-            errors = [i for i in result.issues if i.severity == Severity.ERROR]
-            display_issues = _filter_warnings(result.issues, debug=args.debug)
-            for issue in display_issues:
-                where = f" ({issue.source_path})" if issue.source_path else ""
-                print(
-                    f"{issue.severity.value.upper()} {issue.code}: {issue.message}{where}",
-                    file=sys.stderr,
-                )
-            if errors:
-                return 1
+                errors = [i for i in result.issues if i.severity == Severity.ERROR]
+                display_issues = _filter_warnings(result.issues, debug=args.debug)
+                for issue in display_issues:
+                    where = f" ({issue.source_path})" if issue.source_path else ""
+                    print(
+                        f"{issue.severity.value.upper()} {issue.code}: {issue.message}{where}",
+                        file=sys.stderr,
+                    )
+                if errors:
+                    had_errors = True
+                    continue
 
-            print(result.output_path)
-            return 0
+                all_outputs.append(result.output_path)
+
+            for path in all_outputs:
+                print(path)
+            return 1 if had_errors else 0
         case "lint":
             example_root = _resolve_example_root(args.example) if args.example else None
             data_dir = (
