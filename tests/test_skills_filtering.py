@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import unittest
 
-from cv_compiler.pipeline import _deterministic_skill_highlights
+from cv_compiler.pipeline import _deterministic_skill_filter
 from cv_compiler.render.markdown import build_markdown
 from cv_compiler.schema.models import (
     CanonicalData,
@@ -138,6 +138,6 @@ class TestSkillsFiltering(unittest.TestCase):
             source_path=None,
         )
         categories = tuple((cat.name, cat.items) for cat in data.skills.categories)
-        selected = _deterministic_skill_highlights(categories, job)
+        selected = _deterministic_skill_filter(categories, job)
         self.assertLessEqual(len([s for s in selected if s in skills.categories[0].items]), 5)
         self.assertLessEqual(len([s for s in selected if s in skills.categories[1].items]), 5)

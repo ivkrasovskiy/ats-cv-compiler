@@ -44,6 +44,7 @@ class BuildRequest:
 
 _SKILL_TOKEN_RE = re.compile(r"[a-z0-9][a-z0-9+.#-]*")
 _MAX_JOB_SKILLS_PER_CATEGORY = 5
+_MAX_HIGHLIGHT_SKILLS = 5
 
 
 @dataclass(frozen=True, slots=True)
@@ -171,11 +172,15 @@ def build_cv(request: BuildRequest) -> BuildResult:
                 )
             )
     if job is not None:
+        categories = tuple((cat.name, cat.items) for cat in data.skills.categories)
+        skills_filter = _deterministic_skill_filter(
+            categories,
+            job,
+            preferred=highlighted_skills,
+        )
         if not highlighted_skills:
-            categories = tuple((cat.name, cat.items) for cat in data.skills.categories)
-            highlighted_skills = _deterministic_skill_highlights(categories, job)
-        if highlighted_skills:
-            skills_filter = highlighted_skills
+            all_skills = tuple(item for cat in data.skills.categories for item in cat.items)
+            highlighted_skills = _deterministic_skill_highlights(all_skills, job)
 
     selection = select_content(data, job)
 
@@ -242,31 +247,72 @@ def _load_text_optional(path: Path | None) -> str | None:
     return path.read_text(encoding="utf-8")
 
 
-def _deterministic_skill_highlights(
+def _deterministic_skill_filter(
     categories: tuple[tuple[str, tuple[str, ...]], ...],
     job: JobSpec,
+    *,
+    preferred: tuple[str, ...] = (),
 ) -> tuple[str, ...]:
     keyword_set = _job_keyword_set(job)
+    preferred_set = {s.strip().lower() for s in preferred if s.strip()}
     selected: list[str] = []
     for _, items in categories:
-        scored: list[tuple[int, int, str]] = []
-        for idx, skill in enumerate(items):
-            tokens = _tokenize_skill(skill)
-            score = len(tokens & keyword_set)
-            if score > 0:
-                scored.append((score, idx, skill))
-        scored.sort(key=lambda t: (-t[0], t[1], t[2].lower()))
         category_selected: list[str] = []
         seen: set[str] = set()
-        for _, _, skill in scored:
+        for skill in items:
             key = skill.strip().lower()
             if not key or key in seen:
                 continue
-            category_selected.append(skill)
-            seen.add(key)
-            if len(category_selected) >= _MAX_JOB_SKILLS_PER_CATEGORY:
-                break
+            if key in preferred_set:
+                category_selected.append(skill)
+                seen.add(key)
+                if len(category_selected) >= _MAX_JOB_SKILLS_PER_CATEGORY:
+                    break
+        if len(category_selected) < _MAX_JOB_SKILLS_PER_CATEGORY:
+            scored: list[tuple[int, int, str]] = []
+            for idx, skill in enumerate(items):
+                key = skill.strip().lower()
+                if not key or key in seen:
+                    continue
+                tokens = _tokenize_skill(skill)
+                score = len(tokens & keyword_set)
+                if score > 0:
+                    scored.append((score, idx, skill))
+            scored.sort(key=lambda t: (-t[0], t[1], t[2].lower()))
+            for _, _, skill in scored:
+                key = skill.strip().lower()
+                if not key or key in seen:
+                    continue
+                category_selected.append(skill)
+                seen.add(key)
+                if len(category_selected) >= _MAX_JOB_SKILLS_PER_CATEGORY:
+                    break
         selected.extend(category_selected)
+    return tuple(selected)
+
+
+def _deterministic_skill_highlights(
+    skills: tuple[str, ...],
+    job: JobSpec,
+) -> tuple[str, ...]:
+    keyword_set = _job_keyword_set(job)
+    scored: list[tuple[int, int, str]] = []
+    for idx, skill in enumerate(skills):
+        tokens = _tokenize_skill(skill)
+        score = len(tokens & keyword_set)
+        if score > 0:
+            scored.append((score, idx, skill))
+    scored.sort(key=lambda t: (-t[0], t[1], t[2].lower()))
+    selected: list[str] = []
+    seen: set[str] = set()
+    for _, _, skill in scored:
+        key = skill.strip().lower()
+        if not key or key in seen:
+            continue
+        selected.append(skill)
+        seen.add(key)
+        if len(selected) >= _MAX_HIGHLIGHT_SKILLS:
+            break
     return tuple(selected)
 
 
