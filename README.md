@@ -61,6 +61,8 @@ When enabled, the LLM is used only for constrained derivation of experience bull
 It can also highlight a few key skills from your existing skills list.
 Experience bullets are emphasized with a single bold phrase (covers metrics or leading clause).
 Numeric figures in experience bullets are highlighted; if no figures are present, a key verb is bolded.
+When a job is provided, the Skills section is filtered down to the job-relevant items (LLM-driven
+when available; otherwise a deterministic keyword match capped at 8 items).
 
 You can use the Codex CLI as an optional provider:
 - `uv run cv build --llm codex`

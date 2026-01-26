@@ -8,6 +8,7 @@ Default behavior must remain deterministic; the pipeline implementation is curre
 from __future__ import annotations
 
 import dataclasses
+import re
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
@@ -23,7 +24,7 @@ from cv_compiler.llm.experience import (
 from cv_compiler.parse.loaders import load_canonical_data, load_job_spec
 from cv_compiler.render.renderer import render_cv, render_markdown_to_pdf
 from cv_compiler.render.types import RenderFormat, RenderRequest
-from cv_compiler.schema.models import CanonicalData
+from cv_compiler.schema.models import CanonicalData, JobSpec
 from cv_compiler.select.selector import select_content
 from cv_compiler.types import LintIssue, Severity
 
@@ -39,6 +40,10 @@ class BuildRequest:
     llm_instructions_path: Path | None = None
     experience_regenerate: bool = False
     render_from_markdown: Path | None = None
+
+
+_SKILL_TOKEN_RE = re.compile(r"[a-z0-9][a-z0-9+.#-]*")
+_MAX_JOB_SKILLS_PER_CATEGORY = 5
 
 
 @dataclass(frozen=True, slots=True)
@@ -108,6 +113,7 @@ def build_cv(request: BuildRequest) -> BuildResult:
     job = load_job_spec(request.job_path) if request.job_path else None
 
     highlighted_skills: tuple[str, ...] = ()
+    skills_filter: tuple[str, ...] = ()
     if request.llm is not None:
         try:
             if request.experience_regenerate:
@@ -164,6 +170,12 @@ def build_cv(request: BuildRequest) -> BuildResult:
                     source_path=None,
                 )
             )
+    if job is not None:
+        if not highlighted_skills:
+            categories = tuple((cat.name, cat.items) for cat in data.skills.categories)
+            highlighted_skills = _deterministic_skill_highlights(categories, job)
+        if highlighted_skills:
+            skills_filter = highlighted_skills
 
     selection = select_content(data, job)
 
@@ -210,6 +222,7 @@ def build_cv(request: BuildRequest) -> BuildResult:
             output_path=output_path,
             format=request.format,
             highlighted_skills=highlighted_skills,
+            skills_filter=skills_filter,
         )
     )
     issues.extend(lint_rendered_output(render_result.output_path))
@@ -227,3 +240,43 @@ def _load_text_optional(path: Path | None) -> str | None:
     if not path.exists():
         return None
     return path.read_text(encoding="utf-8")
+
+
+def _deterministic_skill_highlights(
+    categories: tuple[tuple[str, tuple[str, ...]], ...],
+    job: JobSpec,
+) -> tuple[str, ...]:
+    keyword_set = _job_keyword_set(job)
+    selected: list[str] = []
+    for _, items in categories:
+        scored: list[tuple[int, int, str]] = []
+        for idx, skill in enumerate(items):
+            tokens = _tokenize_skill(skill)
+            score = len(tokens & keyword_set)
+            if score > 0:
+                scored.append((score, idx, skill))
+        scored.sort(key=lambda t: (-t[0], t[1], t[2].lower()))
+        category_selected: list[str] = []
+        seen: set[str] = set()
+        for _, _, skill in scored:
+            key = skill.strip().lower()
+            if not key or key in seen:
+                continue
+            category_selected.append(skill)
+            seen.add(key)
+            if len(category_selected) >= _MAX_JOB_SKILLS_PER_CATEGORY:
+                break
+        selected.extend(category_selected)
+    return tuple(selected)
+
+
+def _job_keyword_set(job: JobSpec) -> set[str]:
+    tokens = set(t.strip().lower() for t in job.keywords if t and t.strip())
+    tokens.update(_SKILL_TOKEN_RE.findall(job.raw_text.lower()))
+    if job.title:
+        tokens.update(_SKILL_TOKEN_RE.findall(job.title.lower()))
+    return {t for t in tokens if t}
+
+
+def _tokenize_skill(skill: str) -> set[str]:
+    return set(_SKILL_TOKEN_RE.findall(skill.lower()))

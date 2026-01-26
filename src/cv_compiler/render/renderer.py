@@ -28,6 +28,7 @@ def render_cv(request: RenderRequest) -> RenderResult:
         request.data,
         request.selection,
         highlighted_skills=request.highlighted_skills,
+        skills_filter=request.skills_filter,
     )
     markdown_path.write_text(markdown, encoding="utf-8")
 

@@ -70,6 +70,8 @@ def build_markdown(
     data: CanonicalData,
     selection: SelectionResult,
     highlighted_skills: tuple[str, ...] = (),
+    *,
+    skills_filter: tuple[str, ...] = (),
 ) -> str:
     """Build a Markdown representation of the selected CV content."""
     lines: list[str] = []
@@ -130,9 +132,17 @@ def build_markdown(
 
     add_section("Skills")
     highlight_set = {item.strip().lower() for item in highlighted_skills if item.strip()}
+    filter_set = {item.strip().lower() for item in skills_filter if item.strip()}
     for category in data.skills.categories:
+        filtered_items = [
+            item
+            for item in category.items
+            if not filter_set or item.strip().lower() in filter_set
+        ]
+        if not filtered_items:
+            continue
         formatted_items: list[str] = []
-        for item in category.items:
+        for item in filtered_items:
             if item.strip().lower() in highlight_set:
                 formatted_items.append(f"**{item}**")
             else:
