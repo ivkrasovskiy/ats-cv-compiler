@@ -79,6 +79,8 @@ def select_content(data: CanonicalData, job: JobSpec | None) -> SelectionResult:
     exp_scored: list[tuple[float, float, str, tuple[str, ...], tuple[str, ...]]] = []
     for e in experiences:
         tag_tokens = {t.strip().lower() for t in e.tags if t.strip()}
+        keyword_tokens = {t.strip().lower() for t in e.keywords if t.strip()}
+        tag_tokens = tag_tokens.union(keyword_tokens)
         text_tokens = _tokenize(" ".join(e.bullets) + f" {e.company} {e.title}")
         matched = sorted(keyword_set.intersection(tag_tokens.union(text_tokens)))
         tag_matches = len(keyword_set.intersection(tag_tokens))

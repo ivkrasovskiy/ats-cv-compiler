@@ -38,6 +38,7 @@ class TestMarkdownNormalization(unittest.TestCase):
             start_date="2022-01",
             end_date=None,
             tags=(),
+            keywords=(),
             bullets=("Improved uptime\u2013stability.",),
         )
         skills = Skills(id="skills", categories=(SkillsCategory(name="Tools", items=("Git",)),))
@@ -80,6 +81,7 @@ class TestMarkdownNormalization(unittest.TestCase):
             start_date="2022-01",
             end_date=None,
             tags=(),
+            keywords=(),
             bullets=("Increased coverage by 3-5% through new tests.",),
         )
         skills = Skills(id="skills", categories=(SkillsCategory(name="Tools", items=("Git",)),))

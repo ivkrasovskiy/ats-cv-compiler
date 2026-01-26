@@ -158,6 +158,7 @@ def _load_experience_entry(path: Path) -> ExperienceEntry:
     start_date = _require_str(fm, "start_date", source=path)
     end_date = _optional_str_or_none(fm, "end_date")
     tags = _require_list_of_str(fm, "tags", source=path)
+    keywords = _optional_list_of_str(fm, "keywords", source=path)
     bullets = _require_list_of_str(fm, "bullets", source=path)
     return ExperienceEntry(
         id=entry_id,
@@ -167,6 +168,7 @@ def _load_experience_entry(path: Path) -> ExperienceEntry:
         start_date=start_date,
         end_date=end_date,
         tags=tags,
+        keywords=keywords,
         bullets=bullets,
         source_path=path,
     )

@@ -27,6 +27,7 @@ _ACTIVE_USER_RE = re.compile(r"^user_[a-z0-9_]+$")
 _ACTIVE_LLM_RE = re.compile(r"^llm_[a-z0-9_]+$")
 _THINK_RE = re.compile(r"<think>.*?</think>", re.S)
 _YAML_START_RE = re.compile(r"(?m)^\s*experiences\s*:\s*$")
+_KEYWORD_TOKEN_RE = re.compile(r"[a-z0-9][a-z0-9+.#-]*", re.IGNORECASE)
 
 
 @dataclass(frozen=True, slots=True)
@@ -108,6 +109,7 @@ def parse_experience_drafts(text: str) -> tuple[ExperienceDraft, ...]:
         role = raw.get("role")
         source_ids = raw.get("source_project_ids")
         bullets = raw.get("bullets")
+        keywords_raw = raw.get("keywords")
         if not isinstance(exp_id, str) or not exp_id.strip():
             raise ValueError("Experience id must be a non-empty string")
         if role is not None and not isinstance(role, str):
@@ -116,12 +118,14 @@ def parse_experience_drafts(text: str) -> tuple[ExperienceDraft, ...]:
             raise ValueError("source_project_ids must be a list of strings")
         if not isinstance(bullets, list) or not all(isinstance(x, str) for x in bullets):
             raise ValueError("bullets must be a list of strings")
+        keywords = _parse_keywords(keywords_raw)
         drafts.append(
             ExperienceDraft(
                 id=_safe_id(exp_id),
                 role=role.strip() if isinstance(role, str) and role.strip() else None,
                 bullets=tuple(b.strip() for b in bullets if b.strip()),
                 source_project_ids=tuple(x.strip() for x in source_ids if x.strip()),
+                keywords=keywords,
             )
         )
     return tuple(drafts)
@@ -139,6 +143,7 @@ def write_experience_artifacts(
 
     project_by_id = {p.id: p for p in projects}
     allowed_numbers = _collect_allowed_numbers(projects)
+    allowed_phrases, allowed_tokens = _collect_allowed_keywords(projects)
 
     experience_dir = data_dir / "experience"
     experience_dir.mkdir(parents=True, exist_ok=True)
@@ -169,21 +174,47 @@ def write_experience_artifacts(
 
         role_set = {p.role for p in src_projects if p.role}
         role = None
-        if len(role_set) == 1:
-            role = next(iter(role_set))
+        if role_set:
+            if draft.role:
+                if draft.role in role_set:
+                    role = draft.role
+                else:
+                    warnings.append(
+                        f"Role {draft.role!r} not in project data for experience {draft.id}"
+                    )
+                    role = draft.role
+            elif len(role_set) == 1:
+                role = next(iter(role_set))
+            else:
+                role = sorted(role_set)[0]
+                warnings.append(
+                    f"Multiple roles in project data for experience {draft.id}; "
+                    f"using {role!r}"
+                )
         elif draft.role:
-            if draft.role in role_set:
-                role = draft.role
+            warnings.append(
+                f"Role {draft.role!r} not found in project data for experience {draft.id}"
+            )
+            role = draft.role
         if role is None:
-            raise ValueError(f"Experience {draft.id} needs a role from project data")
+            warnings.append(f"Missing role for experience {draft.id}; skipping entry")
+            continue
 
         tags = sorted({t for p in src_projects for t in p.tags})
         bullets = tuple(
             _validate_bullet_numbers(b, allowed_numbers, warnings=warning_sink)
             for b in draft.bullets[:3]
         )
+        keywords = _validate_keywords(
+            draft.keywords,
+            allowed_phrases=allowed_phrases,
+            allowed_tokens=allowed_tokens,
+            warnings=warning_sink,
+            exp_id=draft.id,
+        )
         exp_id = _derive_experience_id(company, start_date, used_ids)
 
+        tags = sorted({t for p in src_projects for t in p.tags} | set(keywords))
         frontmatter = {
             "id": exp_id,
             "company": company,
@@ -193,6 +224,7 @@ def write_experience_artifacts(
             "end_date": end_date,
             "tags": tags,
             "bullets": list(bullets),
+            "keywords": list(keywords),
             "source_project_ids": list(draft.source_project_ids),
         }
 
@@ -261,7 +293,7 @@ def restore_llm_experience_files(backup_dir: Path, data_dir: Path) -> None:
 def _collect_allowed_numbers(projects: tuple[ProjectEntry, ...]) -> set[str]:
     tokens: set[str] = set()
     for p in projects:
-        text_values: list[str] = [p.name, p.start_date, p.end_date, *p.bullets]
+        text_values: list[str | None] = [p.name, p.start_date, p.end_date, *p.bullets]
         if p.company:
             text_values.append(p.company)
         if p.role:
@@ -272,8 +304,29 @@ def _collect_allowed_numbers(projects: tuple[ProjectEntry, ...]) -> set[str]:
             text_values.append(p.end_date)
         text_values.extend(p.tags)
         for text in text_values:
+            if not text:
+                continue
             tokens.update(_NUM_TOKEN_RE.findall(text))
     return tokens
+
+
+def _collect_allowed_keywords(
+    projects: tuple[ProjectEntry, ...],
+) -> tuple[set[str], set[str]]:
+    phrases: set[str] = set()
+    tokens: set[str] = set()
+    for p in projects:
+        text_values: list[str] = [p.name, *p.bullets, *p.tags]
+        if p.company:
+            text_values.append(p.company)
+        if p.role:
+            text_values.append(p.role)
+        for text in text_values:
+            lowered = text.lower()
+            if lowered:
+                phrases.add(lowered)
+            tokens.update(t.lower() for t in _KEYWORD_TOKEN_RE.findall(lowered))
+    return phrases, tokens
 
 
 def _validate_bullet_numbers(
@@ -286,6 +339,47 @@ def _validate_bullet_numbers(
         if token not in allowed_numbers:
             warnings.append(f"Unknown numeric token {token!r} in bullet: {bullet}")
     return bullet
+
+
+def _parse_keywords(raw: object) -> tuple[str, ...]:
+    if raw is None:
+        return ()
+    if not isinstance(raw, list):
+        raise ValueError("keywords must be a list of strings")
+    keywords: list[str] = []
+    for item in raw:
+        if not isinstance(item, str):
+            raise ValueError("keywords must be a list of strings")
+        text = item.strip()
+        if text:
+            keywords.append(text)
+    return tuple(keywords)
+
+
+def _validate_keywords(
+    keywords: tuple[str, ...],
+    *,
+    allowed_phrases: set[str],
+    allowed_tokens: set[str],
+    warnings: list[str],
+    exp_id: str,
+) -> tuple[str, ...]:
+    seen: set[str] = set()
+    valid: list[str] = []
+    for keyword in keywords:
+        cleaned = keyword.strip()
+        if not cleaned:
+            continue
+        key = cleaned.lower()
+        if key in seen:
+            continue
+        tokens = tuple(t.lower() for t in _KEYWORD_TOKEN_RE.findall(key))
+        if key in allowed_phrases or (tokens and all(t in allowed_tokens for t in tokens)):
+            valid.append(cleaned)
+            seen.add(key)
+        else:
+            warnings.append(f"Unknown keyword {cleaned!r} in experience {exp_id}")
+    return tuple(valid)
 
 
 def _safe_id(text: str) -> str:

@@ -58,6 +58,7 @@ class TestCodexExecConfig(unittest.TestCase):
         self.assertEqual(config.model, "gpt-5.2")
         self.assertEqual(config.timeout_seconds, 600)
         self.assertEqual(config.prompt_mode, "stdin")
+        self.assertFalse(config.progress)
 
     def test_args_and_prompt_mode(self) -> None:
         with _temp_env(

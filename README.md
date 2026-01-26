@@ -67,6 +67,7 @@ You can use the Codex CLI as an optional provider:
   - `CV_CODEX_MODEL` (default: `gpt-5.2`, forwarded to `codex exec --model`)
   - `CV_CODEX_TIMEOUT_SECONDS` (default: 600)
   - `CV_CODEX_PROMPT_MODE` (`stdin` or `arg`, default: `stdin`)
+  - `CV_CODEX_PROGRESS` (set to `1` to show a spinner with elapsed time)
   - If `CV_CODEX_ARGS` does not include an exec mode, `--full-auto` is added automatically.
 
 Planned configuration (via environment variables):

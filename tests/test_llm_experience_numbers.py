@@ -30,6 +30,7 @@ class TestLlmExperienceNumbers(unittest.TestCase):
             role=None,
             source_project_ids=("proj_acme",),
             bullets=("Improved data quality in 2024.",),
+            keywords=(),
         )
 
         with tempfile.TemporaryDirectory() as tmp:

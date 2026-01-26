@@ -6,7 +6,7 @@ This document describes the public-ish entities we expect in the MVP, focusing o
 
 - `Link(label: str, url: str)`
 - `Profile(id: str, name: str, headline: str, location: str, email: str | None, links: tuple[Link, ...], about_me: str, source_path: Path | None = None)`
-- `ExperienceEntry(id: str, company: str, title: str, location: str | None, start_date: str, end_date: str | None, tags: tuple[str, ...], bullets: tuple[str, ...], source_path: Path | None = None)`
+- `ExperienceEntry(id: str, company: str, title: str, location: str | None, start_date: str, end_date: str | None, tags: tuple[str, ...], keywords: tuple[str, ...], bullets: tuple[str, ...], source_path: Path | None = None)`
 - `ProjectEntry(id: str, name: str, company: str | None, role: str | None, start_date: str | None, end_date: str | None, tags: tuple[str, ...], bullets: tuple[str, ...], source_path: Path | None = None)`
 - `SkillsCategory(name: str, items: tuple[str, ...])`
 - `Skills(id: str, categories: tuple[SkillsCategory, ...], source_path: Path | None = None)`

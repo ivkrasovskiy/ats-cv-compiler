@@ -166,7 +166,12 @@ def experience_response_schema() -> dict[str, object]:
                             "required": ["id", "role", "source_project_ids", "bullets"],
                             "properties": {
                                 "id": {"type": "string"},
-                                "role": {"type": "string"},
+                                "role": {"type": ["string", "null"]},
+                                "keywords": {
+                                    "type": "array",
+                                    "maxItems": 8,
+                                    "items": {"type": "string"},
+                                },
                                 "source_project_ids": {
                                     "type": "array",
                                     "items": {"type": "string"},

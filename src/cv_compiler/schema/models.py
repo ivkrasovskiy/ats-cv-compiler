@@ -38,6 +38,7 @@ class ExperienceEntry:
     start_date: str
     end_date: str | None
     tags: tuple[str, ...]
+    keywords: tuple[str, ...]
     bullets: tuple[str, ...]
     source_path: Path | None = None
 

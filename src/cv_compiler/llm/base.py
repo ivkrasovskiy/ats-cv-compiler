@@ -33,6 +33,7 @@ class ExperienceDraft:
     role: str | None
     bullets: tuple[str, ...]
     source_project_ids: tuple[str, ...]
+    keywords: tuple[str, ...]
 
 
 class LLMProvider(Protocol):
