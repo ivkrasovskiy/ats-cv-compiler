@@ -44,6 +44,9 @@ Optional:
 Project file validation (useful if `cv build` fails due to a single bad project file):
 - `uv run python scripts/check_projects.py --data data`
 
+LLM draft validation (useful if LLM output references missing projects/roles):
+- `uv run python scripts/check_llm_drafts.py --draft out/llm_response.json --data data`
+
 Profile field change:
 - `profile.md` now uses `about_me` (string paragraph) instead of `summary` (bullet list).
  - Links with missing URLs are skipped with a warning.
