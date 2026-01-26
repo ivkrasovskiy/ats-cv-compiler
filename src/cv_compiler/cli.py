@@ -16,7 +16,14 @@ from pathlib import Path
 from cv_compiler.explain import format_selection_explanation
 from cv_compiler.ingest import ingest_pdf_to_markdown
 from cv_compiler.lint.linter import lint_build_inputs
-from cv_compiler.llm import LLMConfig, ManualProvider, NoopProvider, OpenAIProvider
+from cv_compiler.llm import (
+    CodexExecConfig,
+    CodexExecProvider,
+    LLMConfig,
+    ManualProvider,
+    NoopProvider,
+    OpenAIProvider,
+)
 from cv_compiler.llm.config import read_env_file, upsert_env_value
 from cv_compiler.parse.loaders import load_canonical_data, load_job_spec
 from cv_compiler.pipeline import BuildRequest, build_cv
@@ -303,9 +310,13 @@ def main(argv: Sequence[str] | None = None) -> int:
                             model=model,
                             base_url=base_url,
                         )
+                elif args.llm == "codex":
+                    config = CodexExecConfig.from_env(env_path=Path("config/llm.env"))
+                    llm = CodexExecProvider(config)
                 else:
                     print(
-                        f"Unknown/unsupported LLM provider: {args.llm!r} (supported: openai, noop)",
+                        "Unknown/unsupported LLM provider: "
+                        f"{args.llm!r} (supported: openai, noop, codex)",
                         file=sys.stderr,
                     )
                     return 2

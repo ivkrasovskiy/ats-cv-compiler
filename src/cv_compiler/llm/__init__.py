@@ -8,12 +8,15 @@ truth. Providers must follow strict non-fabrication constraints.
 from __future__ import annotations
 
 from .base import ExperienceDraft, LLMProvider, NoopProvider
+from .codex import CodexExecConfig, CodexExecProvider
 from .config import LLMConfig
 from .manual import ManualProvider
 from .openai import OpenAIProvider
 
 __all__ = [
     "ExperienceDraft",
+    "CodexExecConfig",
+    "CodexExecProvider",
     "LLMConfig",
     "LLMProvider",
     "ManualProvider",

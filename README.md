@@ -59,6 +59,15 @@ It can also highlight a few key skills from your existing skills list.
 Experience bullets are emphasized with a single bold phrase (covers metrics or leading clause).
 Numeric figures in experience bullets are highlighted; if no figures are present, a key verb is bolded.
 
+You can use the Codex CLI as an optional provider:
+- `uv run cv build --llm codex`
+- Configure via `config/llm.env`:
+  - `CV_CODEX_CMD` (default: `codex`)
+  - `CV_CODEX_ARGS` (extra flags, e.g. `-c mcp_config="config/mcp.json"`)
+  - `CV_CODEX_MODEL` (optional, forwarded to `codex exec --model`)
+  - `CV_CODEX_TIMEOUT_SECONDS` (default: 300)
+  - `CV_CODEX_PROMPT_MODE` (`stdin` or `arg`, default: `stdin`)
+
 Planned configuration (via environment variables):
 - `CV_LLM_MODE`: `api` (endpoint) or `offline` (manual copy/paste)
 - `CV_LLM_BASE_URL`: an OpenAI-compatible HTTP endpoint (e.g. a local server)
