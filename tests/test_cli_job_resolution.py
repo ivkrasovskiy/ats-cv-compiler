@@ -24,6 +24,7 @@ class TestJobResolution(unittest.TestCase):
             jobs_dir.mkdir(parents=True, exist_ok=True)
             (jobs_dir / "b.md").write_text("b", encoding="utf-8")
             (jobs_dir / "a.md").write_text("a", encoding="utf-8")
+            (jobs_dir / "README.md").write_text("readme", encoding="utf-8")
 
             resolved = _resolve_job_paths(None, jobs_dir=jobs_dir)
 

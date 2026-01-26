@@ -162,7 +162,11 @@ def _resolve_job_paths(
             return (None,)
         return (Path(job_arg),)
     if jobs_dir.exists():
-        job_paths = sorted(jobs_dir.glob("*.md"))
+        job_paths = sorted(
+            path
+            for path in jobs_dir.glob("*.md")
+            if path.name.lower() != "readme.md"
+        )
         if job_paths:
             return tuple(job_paths)
     return (None,)
