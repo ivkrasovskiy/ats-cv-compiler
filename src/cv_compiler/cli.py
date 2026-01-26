@@ -73,6 +73,11 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Archive user experience overrides before regenerating with LLM.",
     )
     build.add_argument(
+        "--experience-summary",
+        action="store_true",
+        help="Generate a one-time experience summary (worth mentioning) if missing.",
+    )
+    build.add_argument(
         "--no-pdf",
         action="store_true",
         help="Skip PDF rendering; write only the Markdown output.",
@@ -246,10 +251,10 @@ def main(argv: Sequence[str] | None = None) -> int:
                 if args.no_pdf:
                     print("--from-markdown requires PDF output (omit --no-pdf).", file=sys.stderr)
                     return 2
-                if args.llm or args.job or args.experience_regenerate:
+                if args.llm or args.job or args.experience_regenerate or args.experience_summary:
                     print(
                         "--from-markdown cannot be combined with --llm, --job, or "
-                        "--experience-regenerate.",
+                        "--experience-regenerate, or --experience-summary.",
                         file=sys.stderr,
                     )
                     return 2
@@ -333,11 +338,12 @@ def main(argv: Sequence[str] | None = None) -> int:
                             template_dir=template_dir,
                             out_dir=out_dir,
                             format=render_format,
-                            llm=llm,
-                            llm_instructions_path=None,
-                            experience_regenerate=args.experience_regenerate,
-                        )
+                        llm=llm,
+                        llm_instructions_path=None,
+                        experience_regenerate=args.experience_regenerate,
+                        experience_summary=args.experience_summary,
                     )
+                )
                 except NotImplementedError as e:
                     print(f"Build failed: {e}", file=sys.stderr)
                     had_errors = True

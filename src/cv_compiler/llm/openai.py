@@ -8,6 +8,7 @@ Uses an HTTP endpoint specified by LLMConfig. This provider is optional and only
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from collections.abc import Sequence
 from pathlib import Path
 from urllib.request import Request, urlopen
@@ -23,6 +24,11 @@ from cv_compiler.llm.experience import (
     build_experience_prompt,
     load_experience_templates,
     parse_experience_drafts,
+)
+from cv_compiler.llm.summary import (
+    build_experience_summary_prompt,
+    experience_summary_schema,
+    parse_experience_summary,
 )
 from cv_compiler.llm.skills import (
     build_skills_prompt,
@@ -93,6 +99,20 @@ class OpenAIProvider(LLMProvider):
             response_format=skills_highlight_schema(),
         )
         return parse_skill_highlights(content, allowed_skills=tuple(skills))
+
+    def generate_experience_summary(
+        self,
+        projects: Sequence[ProjectEntry],
+        job: JobSpec | None,
+    ) -> str:
+        prompt = build_experience_summary_prompt(
+            Path("prompts/experience_summary_prompt.md"),
+            projects=tuple(projects),
+            job=job,
+        )
+        payload = build_chat_payload(self._config.model, prompt, experience_summary_schema())
+        content = _request_llm_content(self._config, payload)
+        return parse_experience_summary(content)
 
 
 def request_chat_completion(

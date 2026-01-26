@@ -29,6 +29,7 @@ class RenderRequest:
     markdown_path: Path | None = None
     highlighted_skills: tuple[str, ...] = ()
     skills_filter: tuple[str, ...] = ()
+    experience_summary: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

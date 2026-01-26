@@ -9,6 +9,8 @@ STRICT RULES (NON-NEGOTIABLE):
 - Normalize punctuation (straight quotes, standard hyphens), remove doubled spaces, and fix missing
   spaces around numbers/units (e.g., "by 3%", "at 10K RPM").
 - Preserve proper nouns and acronyms exactly; do not change meaning or tone.
+- Vary lead verbs across bullets; avoid repeating the same opening verb (e.g., avoid multiple
+  bullets starting with "Implemented").
 - Experience IDs must be deterministic: exp_<company>_<start>, where <company> and <start> are taken
   from project data (start is YYYY-MM). If multiple experiences share the same company+start, append
   _2, _3, etc.

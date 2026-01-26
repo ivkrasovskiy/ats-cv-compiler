@@ -72,6 +72,7 @@ def build_markdown(
     highlighted_skills: tuple[str, ...] = (),
     *,
     skills_filter: tuple[str, ...] = (),
+    experience_summary: str | None = None,
 ) -> str:
     """Build a Markdown representation of the selected CV content."""
     lines: list[str] = []
@@ -106,6 +107,9 @@ def build_markdown(
     selected_exp = set(selection.selected_experience_ids)
     if selected_exp:
         add_section("Experience")
+        if experience_summary:
+            add_line(experience_summary)
+            add_blank()
         for entry in sorted(
             [e for e in data.experience if e.id in selected_exp],
             key=lambda x: (x.start_date, x.id),

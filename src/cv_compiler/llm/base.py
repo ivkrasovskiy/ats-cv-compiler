@@ -64,6 +64,12 @@ class LLMProvider(Protocol):
         job: JobSpec | None,
     ) -> Sequence[str]: ...
 
+    def generate_experience_summary(
+        self,
+        projects: Sequence[ProjectEntry],
+        job: JobSpec | None,
+    ) -> str: ...
+
 
 @dataclass(frozen=True, slots=True)
 class NoopProvider:
@@ -93,3 +99,11 @@ class NoopProvider:
     ) -> Sequence[str]:
         _ = (skills, profile, job)
         return []
+
+    def generate_experience_summary(
+        self,
+        projects: Sequence[ProjectEntry],
+        job: JobSpec | None,
+    ) -> str:
+        _ = (projects, job)
+        return ""

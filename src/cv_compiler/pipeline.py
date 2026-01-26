@@ -40,6 +40,7 @@ class BuildRequest:
     llm_instructions_path: Path | None = None
     experience_regenerate: bool = False
     render_from_markdown: Path | None = None
+    experience_summary: bool = False
 
 
 _SKILL_TOKEN_RE = re.compile(r"[a-z0-9][a-z0-9+.#-]*")
@@ -115,6 +116,7 @@ def build_cv(request: BuildRequest) -> BuildResult:
 
     highlighted_skills: tuple[str, ...] = ()
     skills_filter: tuple[str, ...] = ()
+    experience_summary: str | None = None
     if request.llm is not None:
         try:
             if request.experience_regenerate:
@@ -171,6 +173,27 @@ def build_cv(request: BuildRequest) -> BuildResult:
                     source_path=None,
                 )
             )
+        if request.experience_summary:
+            summary_path = request.data_dir / "experience_summary.md"
+            if not summary_path.exists():
+                try:
+                    summary_text = request.llm.generate_experience_summary(data.projects, job)
+                    summary_text = summary_text.strip()
+                    if summary_text:
+                        summary_path.write_text(
+                            _format_experience_summary(summary_text),
+                            encoding="utf-8",
+                        )
+                        experience_summary = summary_text
+                except Exception as exc:  # noqa: BLE001
+                    issues.append(
+                        LintIssue(
+                            code="LLM_SUMMARY_FAILED",
+                            message=str(exc),
+                            severity=Severity.WARNING,
+                            source_path=summary_path,
+                        )
+                    )
     if job is not None:
         categories = tuple((cat.name, cat.items) for cat in data.skills.categories)
         skills_filter = _deterministic_skill_filter(
@@ -219,6 +242,11 @@ def build_cv(request: BuildRequest) -> BuildResult:
     output_stem = "cv_generic" if job is None else f"cv_{_sanitize_stem(job.id)}"
     output_path = request.out_dir / f"{output_stem}.{request.format.value}"
 
+    if experience_summary is None:
+        summary_path = request.data_dir / "experience_summary.md"
+        if summary_path.exists():
+            experience_summary = _load_experience_summary(summary_path)
+
     render_result = render_cv(
         RenderRequest(
             data=data,
@@ -228,6 +256,7 @@ def build_cv(request: BuildRequest) -> BuildResult:
             format=request.format,
             highlighted_skills=highlighted_skills,
             skills_filter=skills_filter,
+            experience_summary=experience_summary,
         )
     )
     issues.extend(lint_rendered_output(render_result.output_path))
@@ -245,6 +274,22 @@ def _load_text_optional(path: Path | None) -> str | None:
     if not path.exists():
         return None
     return path.read_text(encoding="utf-8")
+
+
+def _format_experience_summary(summary: str) -> str:
+    content = "---\n"
+    content += "id: experience_summary\n"
+    content += "---\n\n"
+    content += summary.strip() + "\n"
+    return content
+
+
+def _load_experience_summary(path: Path) -> str:
+    raw = path.read_text(encoding="utf-8")
+    parts = raw.split("---", 2)
+    if len(parts) >= 3:
+        return parts[2].strip()
+    return raw.strip()
 
 
 def _deterministic_skill_filter(

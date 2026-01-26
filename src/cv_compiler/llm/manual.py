@@ -32,6 +32,11 @@ from cv_compiler.llm.skills import (
     parse_skill_highlights,
     skills_highlight_schema,
 )
+from cv_compiler.llm.summary import (
+    build_experience_summary_prompt,
+    experience_summary_schema,
+    parse_experience_summary,
+)
 from cv_compiler.schema.models import JobSpec, Profile, ProjectEntry
 
 
@@ -130,6 +135,36 @@ class ManualProvider(LLMProvider):
         raw = self._skills_response_path.read_text(encoding="utf-8")
         content = _extract_response_content(raw)
         return parse_skill_highlights(content, allowed_skills=tuple(skills))
+
+    def generate_experience_summary(
+        self,
+        projects: Sequence[ProjectEntry],
+        job: JobSpec | None,
+    ) -> str:
+        prompt = build_experience_summary_prompt(
+            Path("prompts/experience_summary_prompt.md"),
+            projects=tuple(projects),
+            job=job,
+        )
+        payload = build_chat_payload(self._model, prompt, experience_summary_schema())
+        request_bundle = {"payload": payload}
+        if self._base_url:
+            request_bundle["endpoint"] = build_chat_endpoint(self._base_url)
+        summary_request_path = self._request_path.with_name("llm_summary_request.json")
+        summary_response_path = self._response_path.with_name("llm_summary_response.json")
+        summary_request_path.parent.mkdir(parents=True, exist_ok=True)
+        summary_request_path.write_text(
+            json.dumps(request_bundle, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        if not summary_response_path.exists():
+            raise ValueError(
+                "Manual LLM mode: summary response file missing. "
+                f"Paste model output into {summary_response_path} and retry."
+            )
+        raw = summary_response_path.read_text(encoding="utf-8")
+        content = _extract_response_content(raw)
+        return parse_experience_summary(content)
 
 
 def _extract_response_content(raw: str) -> str:

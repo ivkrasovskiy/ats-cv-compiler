@@ -30,6 +30,7 @@ from cv_compiler.llm.experience import (
     parse_experience_drafts,
 )
 from cv_compiler.llm.skills import build_skills_prompt, parse_skill_highlights
+from cv_compiler.llm.summary import build_experience_summary_prompt, parse_experience_summary
 from cv_compiler.schema.models import JobSpec, Profile, ProjectEntry
 
 
@@ -131,6 +132,20 @@ class CodexExecProvider(LLMProvider):
         output = self._run_codex(prompt)
         payload = _extract_json_payload(output)
         return parse_skill_highlights(payload, allowed_skills=tuple(skills))
+
+    def generate_experience_summary(
+        self,
+        projects: Sequence[ProjectEntry],
+        job: JobSpec | None,
+    ) -> str:
+        prompt = build_experience_summary_prompt(
+            Path("prompts/experience_summary_prompt.md"),
+            projects=tuple(projects),
+            job=job,
+        )
+        output = self._run_codex(prompt)
+        payload = _extract_json_payload(output)
+        return parse_experience_summary(payload)
 
     def _run_codex(self, prompt: str) -> str:
         exec_args = _ensure_full_auto(self._config.args)
