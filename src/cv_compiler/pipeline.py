@@ -242,7 +242,7 @@ def build_cv(request: BuildRequest) -> BuildResult:
     output_stem = "cv_generic" if job is None else f"cv_{_sanitize_stem(job.id)}"
     output_path = request.out_dir / f"{output_stem}.{request.format.value}"
 
-    if experience_summary is None:
+    if request.experience_summary and experience_summary is None:
         summary_path = request.data_dir / "experience_summary.md"
         if summary_path.exists():
             experience_summary = _load_experience_summary(summary_path)

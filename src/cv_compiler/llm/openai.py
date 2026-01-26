@@ -8,7 +8,6 @@ Uses an HTTP endpoint specified by LLMConfig. This provider is optional and only
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from collections.abc import Sequence
 from pathlib import Path
 from urllib.request import Request, urlopen
@@ -110,8 +109,11 @@ class OpenAIProvider(LLMProvider):
             projects=tuple(projects),
             job=job,
         )
-        payload = build_chat_payload(self._config.model, prompt, experience_summary_schema())
-        content = _request_llm_content(self._config, payload)
+        content = request_chat_completion(
+            self._config,
+            prompt,
+            response_format=experience_summary_schema(),
+        )
         return parse_experience_summary(content)
 
 
