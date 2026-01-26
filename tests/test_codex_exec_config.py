@@ -8,7 +8,7 @@ import os
 import unittest
 from contextlib import contextmanager
 
-from cv_compiler.llm.codex import CodexExecConfig
+from cv_compiler.llm.codex import CodexExecConfig, _ensure_full_auto
 
 
 @contextmanager
@@ -55,8 +55,8 @@ class TestCodexExecConfig(unittest.TestCase):
             config = CodexExecConfig.from_env(env_path=None)
         self.assertEqual(config.command, "codex")
         self.assertEqual(config.args, ())
-        self.assertIsNone(config.model)
-        self.assertEqual(config.timeout_seconds, 300)
+        self.assertEqual(config.model, "gpt-5.2")
+        self.assertEqual(config.timeout_seconds, 600)
         self.assertEqual(config.prompt_mode, "stdin")
 
     def test_args_and_prompt_mode(self) -> None:
@@ -77,3 +77,13 @@ class TestCodexExecConfig(unittest.TestCase):
         with _temp_env({"CV_CODEX_PROMPT_MODE": "unknown"}):
             config = CodexExecConfig.from_env(env_path=None)
         self.assertEqual(config.prompt_mode, "stdin")
+
+    def test_full_auto_default(self) -> None:
+        self.assertEqual(_ensure_full_auto(()), ("--full-auto",))
+
+    def test_full_auto_respects_existing(self) -> None:
+        self.assertEqual(_ensure_full_auto(("--full-auto",)), ("--full-auto",))
+        self.assertEqual(
+            _ensure_full_auto(("--dangerously-bypass-approvals-and-sandbox",)),
+            ("--dangerously-bypass-approvals-and-sandbox",),
+        )

@@ -47,7 +47,11 @@ class CodexExecConfig:
         command = os.getenv("CV_CODEX_CMD") or file_values.get("CV_CODEX_CMD") or "codex"
         args_raw = os.getenv("CV_CODEX_ARGS") or file_values.get("CV_CODEX_ARGS") or ""
         args = tuple(shlex.split(args_raw))
-        model = os.getenv("CV_CODEX_MODEL") or file_values.get("CV_CODEX_MODEL")
+        model = (
+            os.getenv("CV_CODEX_MODEL")
+            or file_values.get("CV_CODEX_MODEL")
+            or "gpt-5.2"
+        )
         timeout_raw = os.getenv("CV_CODEX_TIMEOUT_SECONDS") or file_values.get(
             "CV_CODEX_TIMEOUT_SECONDS"
         )
@@ -56,7 +60,7 @@ class CodexExecConfig:
         )
         if prompt_mode not in {"stdin", "arg"}:
             prompt_mode = "stdin"
-        timeout = _parse_timeout(timeout_raw) if timeout_raw else 300
+        timeout = _parse_timeout(timeout_raw) if timeout_raw else 600
         return CodexExecConfig(
             command=command,
             args=args,
@@ -122,7 +126,8 @@ class CodexExecProvider(LLMProvider):
         return parse_skill_highlights(payload, allowed_skills=tuple(skills))
 
     def _run_codex(self, prompt: str) -> str:
-        cmd = [self._config.command, "exec", *self._config.args]
+        exec_args = _ensure_full_auto(self._config.args)
+        cmd = [self._config.command, "exec", *exec_args]
         if self._config.model:
             cmd.extend(["--model", self._config.model])
         try:
@@ -180,3 +185,14 @@ def _extract_json_payload(raw: str) -> str:
         except json.JSONDecodeError:
             pass
     raise ValueError("LLM skill highlight response must be valid JSON")
+
+
+def _ensure_full_auto(args: tuple[str, ...]) -> tuple[str, ...]:
+    if _has_exec_mode_flag(args):
+        return args
+    return args + ("--full-auto",)
+
+
+def _has_exec_mode_flag(args: tuple[str, ...]) -> bool:
+    flags = {"--full-auto", "--dangerously-bypass-approvals-and-sandbox"}
+    return any(arg in flags for arg in args)
