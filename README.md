@@ -131,3 +131,20 @@ Model sizing guidance (rule of thumb):
 - Bullet rewriting is a relatively small task; a small instruct model is usually sufficient.
 - Prefer a model that can reliably follow “do not invent facts” constraints; start around the 7B-class
   if you’re unsure, and go smaller only if quality is acceptable for your data.
+
+## Build command variations (no LLM required)
+
+Build from canonical data (`data/*.md`), generic:
+- `uv run cv build --job false`
+
+Build from canonical data for a specific job:
+- `uv run cv build --job jobs/<job>.md`
+
+Build using user-edited experience overrides (no LLM):
+- Create `data/experience/user_<id>.md` (copy from `llm_<id>.md` or write manually).
+- Run `uv run cv build --job false` (or `--job jobs/<job>.md`).
+
+Build from a final Markdown CV (edit first, then render):
+- `uv run cv build --no-pdf` (writes `out/cv_<name>.md`)
+- Edit `out/cv_<name>.md`
+- `uv run cv build --from-markdown out/cv_<name>.md`
