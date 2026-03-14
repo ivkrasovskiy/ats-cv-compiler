@@ -38,7 +38,32 @@ else
     fi
 fi
 
-# Step 3 — Install Claude Code (if missing)
+# Step 3 — Ensure npm / Node.js is available
+if command -v npm > /dev/null 2>&1; then
+    ok "npm found ($(node --version))"
+else
+    if ! command -v brew > /dev/null 2>&1; then
+        printf '[…] Installing Homebrew...\n'
+        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+        # Pick up brew in the current shell session (Apple Silicon path)
+        export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+        if ! command -v brew > /dev/null 2>&1; then
+            fail "Homebrew installation failed" \
+                 "Install manually from https://brew.sh then re-run onboard.sh"
+        fi
+        ok "Homebrew installed"
+    fi
+    printf '[…] Installing Node.js via Homebrew...\n'
+    brew install node
+    if command -v npm > /dev/null 2>&1; then
+        ok "Node.js installed ($(node --version))"
+    else
+        fail "Node.js installation failed" \
+             "Try manually: brew install node"
+    fi
+fi
+
+# Step 4 — Install Claude Code (if missing)
 if command -v claude > /dev/null 2>&1; then
     ok "Claude Code found"
 else
@@ -68,12 +93,12 @@ else
     fi
 fi
 
-# Step 4 — Install Python dependencies
+# Step 5 — Install Python dependencies
 printf '[…] Installing Python dependencies...\n'
 uv sync
 ok "Python dependencies installed"
 
-# Step 5 — Open Claude Code
+# Step 6 — Open Claude Code
 printf '\n[✓] Setup complete!\n'
 printf 'Opening Claude Code. It will guide you through the rest.\n\n'
 if [ "${CV_ONBOARD_TEST:-}" = "1" ]; then
