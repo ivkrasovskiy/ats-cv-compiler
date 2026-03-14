@@ -81,3 +81,11 @@ For non-trivial debugging/refactors, prefer this deterministic workflow:
 3. Execute tasks top-to-bottom, updating `tmp/task_index.md` as you go.
 4. When done, clear the task index:
    - `uv run python scripts/task_index.py --clear`
+
+## Non-Technical User Guidance
+
+When the user appears to be non-technical or is setting up for the first time:
+- Suggest `uv run cv doctor` before any manual debugging.
+- Direct them to edit only: `data/`, `jobs/`, `config/llm.env`.
+- Never ask them to edit `pyproject.toml` or run Python scripts directly.
+- Seed `data/` from `examples/basic/data/` if it doesn't exist yet.

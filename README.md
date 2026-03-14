@@ -1,4 +1,26 @@
 # ats-cv-compiler
+
+## Quick Start (5 minutes)
+
+**Requires:** git, Node.js (for Claude Code)
+
+```bash
+git clone https://github.com/you/ats-cv-compiler
+cd ats-cv-compiler
+bash onboard.sh   # installs uv + Claude Code, then opens Claude
+```
+
+Claude will guide you through the rest — editing your data and building your first CV.
+
+**Already have uv and Claude Code?**
+```bash
+uv sync
+uv run cv doctor   # check everything is ready
+uv run cv build --job false
+```
+
+---
+
 A CLI tool that compiles structured career data into ATS-safe CV PDFs, with optional job-specific tailoring using LLMs.
 It also emits a deterministic Markdown CV that serves as the PDF source.
 

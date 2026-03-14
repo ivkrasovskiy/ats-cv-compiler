@@ -42,6 +42,7 @@ def build_skills_prompt(
         }
     prompt = prompt.replace("{{JOB}}", yaml.safe_dump(job_payload, sort_keys=False).strip())
     prompt = prompt.replace("{{SKILLS}}", yaml.safe_dump(list(skills), sort_keys=False).strip())
+    prompt = prompt.replace("{{JOB_CONTEXT}}", "")
     return prompt
 
 

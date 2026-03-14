@@ -52,6 +52,7 @@ def build_experience_summary_prompt(
         "{{PROJECTS}}", yaml.safe_dump(project_payload, sort_keys=False).strip()
     )
     prompt = prompt.replace("{{JOB}}", yaml.safe_dump(job_payload, sort_keys=False).strip())
+    prompt = prompt.replace("{{JOB_CONTEXT}}", "")
     return prompt
 
 

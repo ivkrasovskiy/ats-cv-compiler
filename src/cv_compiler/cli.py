@@ -54,8 +54,7 @@ def _build_parser() -> argparse.ArgumentParser:
         type=str,
         default=None,
         help=(
-            "Path to a job description (e.g. jobs/acme.md). "
-            "Use --job false to force a generic CV."
+            "Path to a job description (e.g. jobs/acme.md). Use --job false to force a generic CV."
         ),
     )
     build.add_argument(
@@ -120,6 +119,8 @@ def _build_parser() -> argparse.ArgumentParser:
         "--example", type=str, default=None, help="Use a bundled example dataset by name."
     )
 
+    sub.add_parser("doctor", help="Diagnose common setup and data issues.")
+
     ingest = sub.add_parser(
         "to_mds_from_pdf", help="Extract a PDF CV into canonical Markdown files."
     )
@@ -175,9 +176,7 @@ def _resolve_job_paths(
         return (Path(job_arg),)
     if jobs_dir.exists():
         job_paths = sorted(
-            path
-            for path in jobs_dir.glob("*.md")
-            if path.name.lower() != "readme.md"
+            path for path in jobs_dir.glob("*.md") if path.name.lower() != "readme.md"
         )
         if job_paths:
             return tuple(job_paths)
@@ -318,10 +317,16 @@ def main(argv: Sequence[str] | None = None) -> int:
                 elif args.llm == "codex":
                     config = CodexExecConfig.from_env(env_path=Path("config/llm.env"))
                     llm = CodexExecProvider(config)
+                elif args.llm == "agents":
+                    from cv_compiler.llm.chain import AgentChainProvider
+                    from cv_compiler.llm.chain_config import AgentChainConfig
+
+                    chain_config = AgentChainConfig.from_env(env_path=Path("config/llm.env"))
+                    llm = AgentChainProvider(chain_config)
                 else:
                     print(
                         "Unknown/unsupported LLM provider: "
-                        f"{args.llm!r} (supported: openai, noop, codex)",
+                        f"{args.llm!r} (supported: openai, noop, codex, agents)",
                         file=sys.stderr,
                     )
                     return 2
@@ -338,12 +343,12 @@ def main(argv: Sequence[str] | None = None) -> int:
                             template_dir=template_dir,
                             out_dir=out_dir,
                             format=render_format,
-                        llm=llm,
-                        llm_instructions_path=None,
-                        experience_regenerate=args.experience_regenerate,
-                        experience_summary=args.experience_summary,
+                            llm=llm,
+                            llm_instructions_path=None,
+                            experience_regenerate=args.experience_regenerate,
+                            experience_summary=args.experience_summary,
+                        )
                     )
-                )
                 except NotImplementedError as e:
                     print(f"Build failed: {e}", file=sys.stderr)
                     had_errors = True
@@ -409,6 +414,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             selection = select_content(data, job)
             print(format_selection_explanation(selection))
             return 0
+        case "doctor":
+            from cv_compiler.doctor import run_doctor
+
+            return run_doctor()
         case "to_mds_from_pdf":
             data_dir = Path(args.data) if args.data else Path("data")
             pdf_path = Path(args.pdf) if args.pdf else data_dir / "cv.pdf"
@@ -440,9 +449,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             else:
                 file_values = read_env_file(env_path)
                 llm_config = None
-                model = (
-                    os.getenv("CV_LLM_MODEL") or file_values.get("CV_LLM_MODEL") or "manual"
-                )
+                model = os.getenv("CV_LLM_MODEL") or file_values.get("CV_LLM_MODEL") or "manual"
                 base_url = os.getenv("CV_LLM_BASE_URL") or file_values.get("CV_LLM_BASE_URL")
 
             try:

@@ -139,9 +139,7 @@ def build_markdown(
     filter_set = {item.strip().lower() for item in skills_filter if item.strip()}
     for category in data.skills.categories:
         filtered_items = [
-            item
-            for item in category.items
-            if not filter_set or item.strip().lower() in filter_set
+            item for item in category.items if not filter_set or item.strip().lower() in filter_set
         ]
         if not filtered_items:
             continue

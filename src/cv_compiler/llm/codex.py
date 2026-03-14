@@ -52,11 +52,7 @@ class CodexExecConfig:
         command = os.getenv("CV_CODEX_CMD") or file_values.get("CV_CODEX_CMD") or "codex"
         args_raw = os.getenv("CV_CODEX_ARGS") or file_values.get("CV_CODEX_ARGS") or ""
         args = tuple(shlex.split(args_raw))
-        model = (
-            os.getenv("CV_CODEX_MODEL")
-            or file_values.get("CV_CODEX_MODEL")
-            or "gpt-5.2"
-        )
+        model = os.getenv("CV_CODEX_MODEL") or file_values.get("CV_CODEX_MODEL") or "gpt-5.2"
         timeout_raw = os.getenv("CV_CODEX_TIMEOUT_SECONDS") or file_values.get(
             "CV_CODEX_TIMEOUT_SECONDS"
         )

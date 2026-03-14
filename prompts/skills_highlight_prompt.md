@@ -17,5 +17,8 @@ headline: "{{PROFILE_HEADLINE}}"
 JOB (optional, may be empty):
 {{JOB}}
 
+JOB SEMANTIC ANALYSIS (from job analyzer, may be empty):
+{{JOB_CONTEXT}}
+
 SKILLS (allowed values):
 {{SKILLS}}

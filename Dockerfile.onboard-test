@@ -1,0 +1,28 @@
+# Simulates a new user's machine:
+#   - Python 3.12 (no uv, no project dependencies)
+#   - Node.js + npm (for Claude Code install step)
+#   - No .venv, no data/ (fresh clone)
+
+FROM python:3.12-slim
+
+# Install Node.js, npm, curl (needed by uv installer)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl nodejs npm && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /repo
+
+# Copy repo (excluding .venv and local out/ artifacts via .dockerignore)
+COPY . .
+
+# Remove any cached venv so this truly looks like a fresh clone
+RUN rm -rf .venv
+
+# Pre-download uv installer to avoid network latency during the test
+# (comment this out to test real network install)
+# RUN curl -LsSf https://astral.sh/uv/install.sh -o /tmp/uv-install.sh
+
+ENV CV_ONBOARD_TEST=1
+
+# Default: run the full onboard test sequence
+CMD ["/bin/sh", "scripts/onboard_test.sh"]

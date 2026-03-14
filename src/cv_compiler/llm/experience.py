@@ -90,6 +90,7 @@ def build_experience_prompt(
         "{{PROJECTS}}", yaml.safe_dump(project_payload, sort_keys=False).strip()
     )
     prompt = prompt.replace("{{JOB}}", yaml.safe_dump(job_payload, sort_keys=False).strip())
+    prompt = prompt.replace("{{JOB_CONTEXT}}", "")
     return prompt
 
 
@@ -188,8 +189,7 @@ def write_experience_artifacts(
             else:
                 role = sorted(role_set)[0]
                 warnings.append(
-                    f"Multiple roles in project data for experience {draft.id}; "
-                    f"using {role!r}"
+                    f"Multiple roles in project data for experience {draft.id}; using {role!r}"
                 )
         elif draft.role:
             warnings.append(
@@ -263,9 +263,7 @@ def backup_llm_experience_files(data_dir: Path) -> Path | None:
     experience_dir = data_dir / "experience"
     if not experience_dir.exists():
         return None
-    candidates = [
-        path for path in experience_dir.glob("*.md") if _ACTIVE_LLM_RE.match(path.stem)
-    ]
+    candidates = [path for path in experience_dir.glob("*.md") if _ACTIVE_LLM_RE.match(path.stem)]
     if not candidates:
         return None
     backup_root = data_dir.parent / "tmp"
