@@ -10,11 +10,11 @@ test.describe('Dashboard', () => {
   })
 
   test('shows System Status section', async ({ page }) => {
-    await expect(page.getByText('System Status')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'System Status' })).toBeVisible()
   })
 
   test('shows Quick Actions section', async ({ page }) => {
-    await expect(page.getByText('Quick Actions')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Quick Actions' })).toBeVisible()
   })
 
   test('has Build Generic CV button', async ({ page }) => {

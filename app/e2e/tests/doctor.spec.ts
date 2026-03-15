@@ -5,7 +5,7 @@ test.describe('Doctor / Lint checks', () => {
     await page.goto('/')
     // Either checks load or error message shown
     await expect(
-      page.getByText('System Status').or(page.getByText('Could not reach backend')),
+      page.getByRole('heading', { name: 'System Status' }).or(page.getByText('Could not reach backend')),
     ).toBeVisible()
   })
 
@@ -15,7 +15,7 @@ test.describe('Doctor / Lint checks', () => {
     await expect(btn).toBeVisible()
     await btn.click()
     // Should not crash — page still shows heading
-    await expect(page.getByText('System Status')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'System Status' })).toBeVisible()
   })
 
   test('Run Lint button triggers lint', async ({ page }) => {
@@ -23,7 +23,7 @@ test.describe('Doctor / Lint checks', () => {
     await page.getByRole('button', { name: 'Run Lint' }).click()
     // Lint Results section should appear
     await expect(
-      page.getByText('Lint Results').or(page.getByText('No issues found')),
+      page.getByRole('heading', { name: 'Lint Results' }).or(page.getByText('No issues found')).first(),
     ).toBeVisible({ timeout: 10_000 })
   })
 })

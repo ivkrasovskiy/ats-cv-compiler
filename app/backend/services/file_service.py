@@ -43,5 +43,5 @@ def file_tree(base: Path) -> list[dict]:
             "size": p.stat().st_size,
         }
         for p in sorted(base.rglob("*"))
-        if p.is_file()
+        if p.is_file() and not any(part.startswith(".") for part in p.parts[len(base.parts):])
     ]
