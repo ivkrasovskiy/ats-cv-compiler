@@ -193,6 +193,7 @@ cython_debug/
 
 # uv cache (kept inside repo for sandboxed runs)
 .uv-cache/
+.uv_cache/
 
 # Build outputs
 out/
