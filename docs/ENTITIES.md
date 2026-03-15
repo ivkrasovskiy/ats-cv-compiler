@@ -45,7 +45,15 @@ Notes:
 - `LLMConfig(base_url: str, model: str, api_key: str | None = None, timeout_seconds: int = 300)` (`src/cv_compiler/llm/config.py`)
   - `from_env(prefix: str = "CV_LLM_", env_path: Path | None = Path("config/llm.env")) -> LLMConfig | None`
 - `OpenAIProvider(config: LLMConfig, prompt_path: Path, templates_path: Path)` (`src/cv_compiler/llm/openai.py`)
+  - retries on HTTP 429/500/502/503/504 and connection errors (up to 3 attempts, 5 s / 15 s backoff)
 - `ManualProvider(request_path: Path, response_path: Path, skills_request_path: Path, skills_response_path: Path, model: str = "manual", base_url: str | None = None, prompt_path: Path, templates_path: Path)` (`src/cv_compiler/llm/manual.py`)
+- `AgentChainProvider(config: AgentChainConfig)` (`src/cv_compiler/llm/chain.py`)
+  - 5-agent pipeline using `claude -p` or `gemini -p` subprocesses
+  - retries each agent call on transient failures (up to 3 attempts, 5 s / 15 s backoff)
+  - agents: job_analysis → experience → skills → summary → bullet_polish
+- `AgentChainConfig` (`src/cv_compiler/llm/chain_config.py`)
+  - `from_env(env_path: Path | None) -> AgentChainConfig`
+  - key fields: `codex: CodexExecConfig`, `context_dir`, `timeout_*`, `keyword_coverage_min`, `max_bullet_chars`, `max_summary_chars`
 - `build_skills_prompt(prompt_path: Path, skills: tuple[str, ...], profile: Profile, job: JobSpec | None) -> str` (`src/cv_compiler/llm/skills.py`)
 - `parse_skill_highlights(text: str, allowed_skills: tuple[str, ...]) -> tuple[str, ...]` (`src/cv_compiler/llm/skills.py`)
 
@@ -77,7 +85,7 @@ Notes:
 
 ## Pipeline (`src/cv_compiler/pipeline.py`)
 
-- `BuildRequest(data_dir: Path, job_path: Path | None, template_dir: Path, out_dir: Path, format: RenderFormat = RenderFormat.PDF, llm: LLMProvider | None = None, llm_instructions_path: Path | None = None, experience_regenerate: bool = False, render_from_markdown: Path | None = None)`
+- `BuildRequest(data_dir: Path, job_path: Path | None, template_dir: Path, out_dir: Path, format: RenderFormat = RenderFormat.PDF, llm: LLMProvider | None = None, llm_instructions_path: Path | None = None, experience_regenerate: bool = False, render_from_markdown: Path | None = None, experience_summary: bool = False)`
 - `BuildResult(output_path: Path, markdown_path: Path | None, pdf_path: Path | None, issues: tuple[LintIssue, ...])`
 - `build_cv(request: BuildRequest) -> BuildResult`
 

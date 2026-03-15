@@ -2,17 +2,21 @@
 
 ## Quick Start (5 minutes)
 
-**Requires:** git, Node.js (for Claude Code)
+**Requires:** git, Node.js (npm is used to install the AI assistant)
 
 ```bash
 git clone https://github.com/you/ats-cv-compiler
 cd ats-cv-compiler
-bash onboard.sh   # installs uv + Claude Code, then opens Claude
+bash onboard.sh   # installs uv + AI assistant (Gemini CLI or Claude Code), then opens it
 ```
 
-Claude will guide you through the rest — editing your data and building your first CV.
+The assistant will guide you through the rest — editing your data and building your first CV.
 
-**Already have uv and Claude Code?**
+The script will ask which assistant to install:
+- **Gemini CLI** — free with any Google account (recommended for most users)
+- **Claude Code** — requires a paid Claude Pro subscription
+
+**Already have uv and an AI assistant (gemini or claude)?**
 ```bash
 uv sync
 uv run cv doctor   # check everything is ready

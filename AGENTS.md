@@ -82,6 +82,15 @@ For non-trivial debugging/refactors, prefer this deterministic workflow:
 4. When done, clear the task index:
    - `uv run python scripts/task_index.py --clear`
 
+## AI Assistant Files
+
+Two project guide files exist at the repo root — use the one matching the user's assistant:
+- `CLAUDE.md` — instructions for Claude Code users (paid Claude Pro subscription)
+- `GEMINI.md` — instructions for Gemini CLI users (free with any Google account)
+
+Both files contain identical onboarding sequences, key commands, file format references, and
+rules. The only differences are the title and rules section header.
+
 ## Non-Technical User Guidance
 
 When the user appears to be non-technical or is setting up for the first time:
@@ -89,3 +98,5 @@ When the user appears to be non-technical or is setting up for the first time:
 - Direct them to edit only: `data/`, `jobs/`, `config/llm.env`.
 - Never ask them to edit `pyproject.toml` or run Python scripts directly.
 - Seed `data/` from `examples/basic/data/` if it doesn't exist yet.
+- Onboarding is handled by `onboard.sh` — it installs uv, the chosen AI assistant
+  (Gemini CLI or Claude Code), Python deps, and opens the assistant automatically.

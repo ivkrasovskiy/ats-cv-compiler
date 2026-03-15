@@ -108,9 +108,12 @@ data/               ← your career data (edit these)
 jobs/               ← job descriptions for targeted builds
 out/                ← generated CVs (do not edit)
 templates/          ← PDF layout templates
+prompts/            ← AI instructions for bullet rewriting
 examples/basic/     ← safe working example (read-only reference)
 config/llm.env      ← LLM settings (optional)
 src/cv_compiler/    ← Python source
+onboard.sh          ← bootstrap script for new users
+CLAUDE.md           ← project guide for Claude Code users
 ```
 
 ---

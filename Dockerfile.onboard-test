@@ -1,6 +1,6 @@
 # Simulates a new user's machine:
 #   - Python 3.12 (no uv, no project dependencies)
-#   - Node.js + npm (for Claude Code install step)
+#   - Node.js + npm (for AI assistant install step — Gemini CLI or Claude Code)
 #   - No .venv, no data/ (fresh clone)
 
 FROM python:3.12-slim
