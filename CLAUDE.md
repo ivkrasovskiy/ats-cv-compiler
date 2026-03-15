@@ -53,6 +53,7 @@ After each step, confirm the user is ready before moving on.
 | `uv run cv doctor` | Diagnose why build is failing |
 | `uv run cv lint` | Validate data files |
 | `uv run cv build --example basic` | Try the bundled example (safe to run) |
+| `uv run --extra app cv-app` | Start the local web GUI → http://localhost:8000 |
 
 ---
 
