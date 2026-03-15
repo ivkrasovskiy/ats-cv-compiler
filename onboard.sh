@@ -63,46 +63,106 @@ else
     fi
 fi
 
-# Step 4 — Install Claude Code (if missing)
-if command -v claude > /dev/null 2>&1; then
-    ok "Claude Code found"
+# Step 4 — Choose AI assistant
+#
+# Priority order:
+#   1. CV_ONBOARD_ASSISTANT env var set → use it (CI/test override, skips prompt)
+#   2. `claude` already on PATH → use claude (skip install, skip question)
+#   3. `gemini` already on PATH → use gemini (skip install, skip question)
+#   4. Neither found → ask the user
+if [ -n "${CV_ONBOARD_ASSISTANT:-}" ]; then
+    ASSISTANT="$CV_ONBOARD_ASSISTANT"
+    ok "AI assistant: $ASSISTANT (from CV_ONBOARD_ASSISTANT)"
+elif command -v claude > /dev/null 2>&1; then
+    ASSISTANT=claude
+    ok "Claude Code found (using claude)"
+elif command -v gemini > /dev/null 2>&1; then
+    ASSISTANT=gemini
+    ok "Gemini CLI found (using gemini)"
 else
+    printf '\nWhich AI assistant would you like to use?\n'
+    printf '  Gemini CLI is free with any Google account (recommended for most users).\n'
+    printf '  Claude Code requires a paid Claude Pro subscription.\n\n'
+    printf 'Do you have a paid Claude Pro subscription? [y/N]: '
+    read -r CLAUDE_ANSWER
+    case "$CLAUDE_ANSWER" in
+        [Yy]*) ASSISTANT=claude ;;
+        *)     ASSISTANT=gemini ;;
+    esac
+fi
+
+# Step 5 — Install chosen assistant (if not already on PATH)
+_install_npm_package() {
+    PKG="$1"
+    BIN="$2"
+    if command -v "$BIN" > /dev/null 2>&1; then
+        return 0
+    fi
     if command -v npm > /dev/null 2>&1; then
-        printf '[…] Installing Claude Code...\n'
+        printf '[…] Installing %s...\n' "$PKG"
         # Try global install; fall back to user-local prefix if permission denied
-        if npm install -g @anthropic-ai/claude-code 2>/dev/null; then
+        if npm install -g "$PKG" 2>/dev/null; then
             : # success
         else
             printf '[…] Global npm install failed (permissions). Trying user-local prefix...\n'
             NPM_PREFIX="$HOME/.npm-global"
             npm config set prefix "$NPM_PREFIX"
-            npm install -g @anthropic-ai/claude-code
+            npm install -g "$PKG"
         fi
         # Always add npm's configured prefix bin to PATH (handles user-local installs)
         NPM_BIN="$(npm config get prefix)/bin"
         export PATH="$NPM_BIN:$PATH"
-        if command -v claude > /dev/null 2>&1; then
-            ok "Claude Code installed"
+        if command -v "$BIN" > /dev/null 2>&1; then
+            ok "$PKG installed"
         else
-            fail "Claude Code installation failed" \
-                 "Try manually: npm install -g @anthropic-ai/claude-code"
+            fail "$PKG installation failed" \
+                 "Try manually: npm install -g $PKG"
         fi
     else
-        fail "npm not found (required to install Claude Code)" \
+        fail "npm not found (required to install $PKG)" \
              "Install Node.js from https://nodejs.org/ then re-run onboard.sh"
     fi
-fi
+}
 
-# Step 5 — Install Python dependencies
+case "$ASSISTANT" in
+    claude) _install_npm_package "@anthropic-ai/claude-code" "claude" ;;
+    gemini) _install_npm_package "@google/gemini-cli"        "gemini" ;;
+    *)
+        fail "Unknown assistant: $ASSISTANT" \
+             "Set CV_ONBOARD_ASSISTANT to 'claude' or 'gemini'"
+        ;;
+esac
+
+# Step 6 — Install Python dependencies
 printf '[…] Installing Python dependencies...\n'
 uv sync
 ok "Python dependencies installed"
 
-# Step 6 — Open Claude Code
+# Step 7 — Open chosen assistant
 printf '\n[✓] Setup complete!\n'
-printf 'Opening Claude Code. It will guide you through the rest.\n\n'
+printf 'Opening %s. It will guide you through the rest.\n' "$ASSISTANT"
+
+printf '\n'
+printf '╔══════════════════════════════════════════════════════════════╗\n'
+printf '║                        IMPORTANT TIP                        ║\n'
+printf '╠══════════════════════════════════════════════════════════════╣\n'
+printf '║  At any point, if you have questions about this repo,       ║\n'
+printf '║  how to build your CV, or anything else — just open a new   ║\n'
+printf '║  terminal and run:                                           ║\n'
+printf '║                                                              ║\n'
+printf '║      $ %s%-52s║\n' "$ASSISTANT" ""
+printf '║                                                              ║\n'
+printf '║  Then ask your question in plain English.                    ║\n'
+printf '╚══════════════════════════════════════════════════════════════╝\n'
+printf '\n'
+
+sleep 5
+
 if [ "${CV_ONBOARD_TEST:-}" = "1" ]; then
-    printf '[TEST MODE] Would exec claude here. Skipping.\n'
+    printf '[TEST MODE] Would exec %s. Skipping.\n' "$ASSISTANT"
     exit 0
 fi
-exec claude
+
+printf 'Press Enter to continue...'
+read -r _ENTER
+exec "$ASSISTANT"

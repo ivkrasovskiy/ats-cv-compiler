@@ -45,13 +45,21 @@ def run_doctor(cwd: Path = Path(".")) -> int:
             "curl -LsSf https://astral.sh/uv/install.sh | sh",
         )
 
-    # 3. claude on PATH
-    if shutil.which("claude"):
+    # 3. claude or gemini on PATH
+    has_claude = shutil.which("claude")
+    has_gemini = shutil.which("gemini")
+    if has_claude and has_gemini:
+        ok("claude and gemini both found")
+    elif has_claude:
         ok("claude found")
+    elif has_gemini:
+        ok("gemini found")
     else:
         fail(
-            "claude not found on PATH",
-            "npm install -g @anthropic-ai/claude-code",
+            "No AI assistant found (claude or gemini)",
+            "Run ./onboard.sh  — or install manually:\n"
+            "    Claude: npm install -g @anthropic-ai/claude-code\n"
+            "    Gemini: npm install -g @google/gemini-cli  (free with Google account)",
         )
 
     # 4. data/ exists

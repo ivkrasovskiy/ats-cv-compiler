@@ -10,6 +10,7 @@ from __future__ import annotations
 import re
 import subprocess
 import sys
+import time
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -46,6 +47,9 @@ _SUMMARY_PROMPT_PATH = Path("prompts/experience_summary_prompt.md")
 _TEMPLATES_PATH = Path("prompts/experience_templates.yaml")
 
 _NUM_RE = re.compile(r"\d+(?:\.\d+)?%?")
+# Delays (seconds) before 2nd and 3rd attempts when the agent CLI returns an error.
+# Covers transient rate-limit / busy-server responses from Claude Code or Gemini CLI.
+_AGENT_RETRY_DELAYS: tuple[int, ...] = (5, 15)
 
 
 class AgentChainProvider:
@@ -212,38 +216,64 @@ class AgentChainProvider:
         return analysis
 
     def _run_agent(self, prompt: str, *, timeout: int) -> str:
-        """Run claude -p subprocess with the given prompt. Returns output text."""
+        """Run the AI CLI subprocess with the given prompt. Returns output text.
+
+        Retries up to len(_AGENT_RETRY_DELAYS) extra times on transient failures
+        (non-zero exit codes, empty output, timeouts) — covers rate-limit / busy-server
+        responses from Claude Code or Gemini CLI free tier.
+        """
         cfg = self._config.codex
         cmd = [cfg.command, *cfg.args]
-        try:
-            if cfg.prompt_mode == "arg":
-                result = subprocess.run(
-                    cmd + [prompt],
-                    capture_output=True,
-                    text=True,
-                    timeout=timeout,
-                    check=False,
+        last_exc: ValueError | None = None
+
+        for attempt in range(1, len(_AGENT_RETRY_DELAYS) + 2):
+            if attempt > 1:
+                delay = _AGENT_RETRY_DELAYS[attempt - 2]
+                print(
+                    f"[agents] attempt {attempt - 1} failed ({last_exc}); "
+                    f"retrying in {delay}s — this can happen when the AI service is busy",
+                    file=sys.stderr,
                 )
-            else:
-                result = subprocess.run(
-                    cmd,
-                    input=prompt,
-                    capture_output=True,
-                    text=True,
-                    timeout=timeout,
-                    check=False,
-                )
-        except FileNotFoundError as exc:
-            raise ValueError(f"agent chain failed: command not found ({cfg.command})") from exc
-        except subprocess.TimeoutExpired as exc:
-            raise ValueError(f"agent chain timed out after {timeout}s") from exc
-        if result.returncode != 0:
-            stderr = (result.stderr or "").strip()
-            raise ValueError(f"agent chain failed: {stderr or 'unknown error'}")
-        output = (result.stdout or "").strip()
-        if not output:
-            raise ValueError("agent chain returned empty output")
-        return output
+                time.sleep(delay)
+
+            try:
+                if cfg.prompt_mode == "arg":
+                    result = subprocess.run(
+                        cmd + [prompt],
+                        capture_output=True,
+                        text=True,
+                        timeout=timeout,
+                        check=False,
+                    )
+                else:
+                    result = subprocess.run(
+                        cmd,
+                        input=prompt,
+                        capture_output=True,
+                        text=True,
+                        timeout=timeout,
+                        check=False,
+                    )
+            except FileNotFoundError as exc:
+                # Binary not on PATH — not a transient error, fail immediately
+                raise ValueError(f"agent chain failed: command not found ({cfg.command})") from exc
+            except subprocess.TimeoutExpired:
+                last_exc = ValueError(f"agent chain timed out after {timeout}s")
+                continue
+
+            if result.returncode != 0:
+                stderr = (result.stderr or "").strip()
+                last_exc = ValueError(f"agent chain failed: {stderr or 'unknown error'}")
+                continue
+
+            output = (result.stdout or "").strip()
+            if not output:
+                last_exc = ValueError("agent chain returned empty output")
+                continue
+
+            return output
+
+        raise last_exc  # type: ignore[misc]
 
     def _warn(self, message: str) -> None:
         self._warnings.append(message)

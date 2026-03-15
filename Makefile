@@ -1,4 +1,4 @@
-.PHONY: test test-onboard test-onboard-setup lint fmt check
+.PHONY: test test-onboard test-onboard-claude test-onboard-gemini test-onboard-setup lint fmt check
 
 # ── Unit tests ─────────────────────────────────────────────────────────────────
 test:
@@ -32,14 +32,14 @@ test-onboard-setup:
 	orb run -m cv-test sudo apt-get install -y nodejs npm -q
 	@echo "[✓] cv-test VM ready. Run: make test-onboard"
 
-test-onboard:
-	@echo "=== Onboarding integration test (orb VM: cv-test) ==="
+test-onboard: test-onboard-claude test-onboard-gemini  ## run both assistant paths
+
+_test-onboard-run:
+	@echo "=== Onboarding integration test: ASSISTANT=$(ASSISTANT) (orb VM: cv-test) ==="
 	@echo ""
-	@# Use a Linux-specific venv so it doesn't clash with the macOS .venv on the shared FS.
-	@# Real new users won't have a .venv at all — this only affects the shared-mount test.
-	@echo "--- Step 1: onboard.sh (full bootstrap, skip exec claude) ---"
+	@echo "--- Step 1: onboard.sh (full bootstrap, skip exec $(ASSISTANT)) ---"
 	orb run -m cv-test bash -c \
-	  'cd $(CURDIR) && CV_ONBOARD_TEST=1 UV_PROJECT_ENVIRONMENT=/tmp/cv-venv-linux bash onboard.sh'
+	  'cd $(CURDIR) && CV_ONBOARD_TEST=1 CV_ONBOARD_ASSISTANT=$(ASSISTANT) UV_PROJECT_ENVIRONMENT=/tmp/cv-venv-linux bash onboard.sh'
 	@echo ""
 	@echo "--- Step 2: cv doctor (healthy data) ---"
 	orb run -m cv-test bash -c \
@@ -59,4 +59,10 @@ test-onboard:
 	  'export PATH="$$HOME/.npm-global/bin:$$HOME/.local/bin:$$PATH" \
 	   && cd $(CURDIR) && UV_PROJECT_ENVIRONMENT=/tmp/cv-venv-linux uv run cv build --job false'
 	@echo ""
-	@echo "=== All onboarding tests passed ==="
+	@echo "=== All onboarding tests passed (ASSISTANT=$(ASSISTANT)) ==="
+
+test-onboard-claude:  ## force claude path (requires Claude Pro subscription in VM)
+	$(MAKE) _test-onboard-run ASSISTANT=claude
+
+test-onboard-gemini:  ## force gemini path (free with Google account)
+	$(MAKE) _test-onboard-run ASSISTANT=gemini

@@ -1,4 +1,4 @@
-# Claude Code — Project Guide
+# Gemini CLI — Project Guide
 
 This repo is **ats-cv-compiler**: a CLI tool that turns structured Markdown/YAML career data
 into ATS-safe CV PDFs. No web server, no database — just files and a build command.
@@ -83,7 +83,7 @@ See `examples/basic/data/` for working examples of every file type.
 
 ---
 
-## Rules for Claude Code in this repo
+## Rules for Gemini in this repo
 
 - **NEVER** invent metrics, employers, titles, dates, or numbers not present in the user's data files.
 - **NEVER** modify files in `out/` or `tmp/` (generated artifacts).
@@ -122,5 +122,21 @@ src/cv_compiler/    ← Python source
 | `Missing required file: data/profile.md` | Run `uv run cv doctor` or copy from examples |
 | `Failed to load data` YAML parse error | Run `uv run cv doctor` — it will show which file and line |
 | Build output looks wrong | Run `uv run cv lint` to check for constraint violations |
-| Claude bullets sound invented | Check that `data/projects/` files have accurate `bullets[]` |
+| Gemini bullets sound invented | Check that `data/projects/` files have accurate `bullets[]` |
 | `uv: command not found` | Run `./onboard.sh` — it installs uv automatically |
+
+---
+
+## Rate limits and busy servers (free tier)
+
+Gemini CLI free tier allows 60 requests/minute and 1 000 requests/day with any Google account.
+Most CV builds stay well within these limits.
+
+**If Gemini says it's busy or suggests trying again:**
+- Type `try again` or simply re-send your last message — transient overload usually clears in seconds
+- If it persists, wait 30–60 seconds before retrying
+- The `uv run cv build --llm agents` pipeline already retries automatically on server errors
+
+**If you hit the daily limit:**
+- The basic build (`uv run cv build --job false`) uses **no** Gemini quota at all
+- Only the `--llm agents` flag triggers AI calls; omit it to build without quota

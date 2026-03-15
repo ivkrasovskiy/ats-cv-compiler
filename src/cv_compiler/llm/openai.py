@@ -8,8 +8,11 @@ Uses an HTTP endpoint specified by LLMConfig. This provider is optional and only
 from __future__ import annotations
 
 import json
+import sys
+import time
 from collections.abc import Sequence
 from pathlib import Path
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from cv_compiler.llm.base import (
@@ -117,6 +120,12 @@ class OpenAIProvider(LLMProvider):
         return parse_experience_summary(content)
 
 
+# HTTP status codes that indicate a transient server-side issue worth retrying.
+_RETRY_STATUS_CODES: frozenset[int] = frozenset({429, 500, 502, 503, 504})
+# Delays (seconds) before 2nd and 3rd attempts.
+_HTTP_RETRY_DELAYS: tuple[int, ...] = (5, 15)
+
+
 def request_chat_completion(
     config: LLMConfig, prompt: str, response_format: dict[str, object] | None
 ) -> str:
@@ -128,14 +137,37 @@ def request_chat_completion(
     if config.api_key:
         headers["Authorization"] = f"Bearer {config.api_key}"
 
-    req = Request(url, data=data, headers=headers, method="POST")
-    with urlopen(req, timeout=config.timeout_seconds) as resp:  # noqa: S310
-        body = resp.read().decode("utf-8")
-    parsed = json.loads(body)
-    content = extract_chat_content(parsed)
-    if content is None:
-        raise ValueError("Unexpected LLM response shape")
-    return content
+    last_exc: Exception | None = None
+    for attempt in range(1, len(_HTTP_RETRY_DELAYS) + 2):
+        if attempt > 1:
+            delay = _HTTP_RETRY_DELAYS[attempt - 2]
+            print(
+                f"[openai] attempt {attempt - 1} failed ({last_exc}); "
+                f"retrying in {delay}s — the LLM API may be busy",
+                file=sys.stderr,
+            )
+            time.sleep(delay)
+
+        try:
+            req = Request(url, data=data, headers=headers, method="POST")
+            with urlopen(req, timeout=config.timeout_seconds) as resp:  # noqa: S310
+                body = resp.read().decode("utf-8")
+        except HTTPError as exc:
+            if exc.code in _RETRY_STATUS_CODES:
+                last_exc = exc
+                continue
+            raise
+        except URLError as exc:
+            last_exc = exc
+            continue
+
+        parsed = json.loads(body)
+        content = extract_chat_content(parsed)
+        if content is None:
+            raise ValueError("Unexpected LLM response shape")
+        return content
+
+    raise RuntimeError(f"LLM request failed after {len(_HTTP_RETRY_DELAYS) + 1} attempts: {last_exc}")
 
 
 def build_chat_endpoint(base_url: str) -> str:
