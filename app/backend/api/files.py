@@ -219,3 +219,36 @@ async def upload_cv_pdf(file: UploadFile) -> dict:
     with dest.open("wb") as f:
         shutil.copyfileobj(file.file, f)
     return {"saved": True, "path": "data/cv.pdf"}
+
+
+# ── ingest pdf ────────────────────────────────────────────────────────────────
+
+
+@router.post("/ingest/pdf")
+def run_ingest_pdf() -> dict:
+    from cv_compiler.ingest.pdf_ingest import ingest_pdf_to_markdown
+    from cv_compiler.llm.provider import resolve_from_env
+
+    root = get_project_root()
+    pdf_path = root / "data" / "cv.pdf"
+    if not pdf_path.exists():
+        raise HTTPException(400, "data/cv.pdf not found. Upload a PDF first.")
+
+    try:
+        resolved = resolve_from_env(root / "config" / "llm.env")
+        result = ingest_pdf_to_markdown(
+            data_dir=root / "data",
+            pdf_path=pdf_path,
+            llm_mode=resolved.ingest_mode,
+            llm_config=resolved.llm_config,
+            codex_config=resolved.codex_config,
+            prompt_path=root / "prompts" / "pdf_ingest_prompt.md",
+            overwrite=True,
+        )
+    except Exception as exc:
+        raise HTTPException(500, str(exc)) from exc
+
+    return {
+        "written": [str(p.relative_to(root)) for p in result.written_paths],
+        "warnings": list(result.warnings),
+    }

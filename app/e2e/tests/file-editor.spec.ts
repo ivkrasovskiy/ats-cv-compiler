@@ -32,4 +32,11 @@ test.describe('Profile (Data Browser)', () => {
     await firstFile.click()
     await expect(page.getByRole('button', { name: /Save|Saving/ })).toBeVisible()
   })
+
+  test('shows Cancel button after selecting a file', async ({ page }) => {
+    const firstFile = page.locator('details button').first()
+    await firstFile.waitFor()
+    await firstFile.click()
+    await expect(page.getByRole('button', { name: 'Cancel' })).toBeVisible({ timeout: 5_000 })
+  })
 })

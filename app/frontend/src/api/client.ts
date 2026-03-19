@@ -161,3 +161,9 @@ export const uploadCvPdf = (file: File) => {
     json<{ saved: boolean; path: string }>(r),
   )
 }
+
+// ── ingest pdf ─────────────────────────────────────────────────────────────
+export const ingestPdf = () =>
+  fetch(`${BASE}/ingest/pdf`, { method: 'POST' }).then(r =>
+    json<{ written: string[]; warnings: string[] }>(r),
+  )

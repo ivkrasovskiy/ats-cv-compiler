@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import re
 import shutil
+import subprocess
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -17,6 +18,7 @@ from urllib.request import Request, urlopen
 
 import yaml
 
+from cv_compiler.llm.codex import CodexExecConfig
 from cv_compiler.llm.config import LLMConfig
 from cv_compiler.llm.openai import build_chat_endpoint, build_chat_payload, extract_chat_content
 
@@ -119,7 +121,8 @@ def ingest_pdf_to_markdown(
     data_dir: Path,
     pdf_path: Path,
     llm_mode: str,
-    llm_config: LLMConfig | None,
+    llm_config: LLMConfig | None = None,
+    codex_config: CodexExecConfig | None = None,
     prompt_path: Path = Path("prompts/pdf_ingest_prompt.md"),
     overwrite: bool = False,
     request_path: Path | None = None,
@@ -136,6 +139,10 @@ def ingest_pdf_to_markdown(
         if llm_config is None:
             raise ValueError("Missing LLM config for API mode")
         content = _request_llm_content(llm_config, prompt)
+    elif llm_mode == "cli":
+        if codex_config is None:
+            raise ValueError("Missing codex config for CLI mode")
+        content = _cli_llm_content(codex_config, prompt)
     elif llm_mode == "offline":
         if request_path is None or response_path is None:
             raise ValueError("Offline mode requires request/response paths")
@@ -329,6 +336,30 @@ def _request_llm_content(config: LLMConfig, prompt: str) -> str:
     if content is None:
         raise ValueError("Unexpected LLM response shape")
     return content
+
+
+def _cli_llm_content(config: CodexExecConfig, prompt: str) -> str:
+    cmd = [config.command, *config.args]
+    try:
+        result = subprocess.run(
+            cmd,
+            input=prompt.encode("utf-8"),
+            capture_output=True,
+            timeout=config.timeout_seconds,
+            check=False,
+        )
+    except FileNotFoundError as exc:
+        raise ValueError(
+            f"CLI command not found: {config.command}. Is it installed and on your PATH?"
+        ) from exc
+    if result.returncode != 0:
+        stderr = result.stderr.decode("utf-8", errors="replace").strip()
+        raise ValueError(f"CLI LLM failed (exit {result.returncode}): {stderr or 'unknown error'}")
+    raw = result.stdout.decode("utf-8", errors="replace").strip()
+    # Strip markdown code fences if present
+    raw = re.sub(r"^```(?:json)?\s*", "", raw)
+    raw = re.sub(r"\s*```$", "", raw)
+    return raw.strip()
 
 
 def _manual_llm_content(

@@ -16,7 +16,7 @@ test.describe('Generated CVs', () => {
     await expect(emptyMsg.or(panel)).toBeVisible({ timeout: 5_000 })
   })
 
-  test('shows editor placeholder when no MD selected', async ({ page }) => {
-    await expect(page.getByText('Select "Edit MD" to edit')).toBeVisible()
+  test('shows editor placeholder when no file selected', async ({ page }) => {
+    await expect(page.getByText('Click a file name to preview its PDF.')).toBeVisible()
   })
 })

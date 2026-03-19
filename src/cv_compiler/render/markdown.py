@@ -215,4 +215,4 @@ def _bold_first_keyword(text: str) -> str:
 
 
 def _fix_spacing(text: str) -> str:
-    return re.sub(r"([A-Za-z])(\d)", r"\\1 \\2", text)
+    return re.sub(r"([A-Za-z])(\d)", r"\1 \2", text)

@@ -1,12 +1,14 @@
 import { useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import {
   getDoctor,
   getLint,
   listJobFiles,
   startBuild,
   uploadCvPdf,
+  ingestPdf,
+  getConfig,
   buildStreamUrl,
 } from '../api/client'
 import { StatusCard } from '../components/StatusCard'
@@ -55,31 +57,76 @@ function InlineLog({ lines, status }: { lines: string[]; status: BuildStatus }) 
   )
 }
 
+const PROVIDER_LABELS: Record<string, string> = {
+  gemini: 'Gemini CLI',
+  claude: 'Claude CLI',
+  custom: 'Custom endpoint',
+}
+
+function AiProviderNote({ provider }: { provider?: string }) {
+  const label = PROVIDER_LABELS[provider ?? ''] ?? 'Gemini CLI'
+  const isDefault = !provider || provider === 'gemini'
+  return (
+    <p className="mt-2 text-xs text-slate-500">
+      AI parsing uses <span className="text-slate-400 font-medium">{label}</span>
+      {isDefault && ' (default)'}
+      {' '}—{' '}
+      <a href="/build" className="underline text-indigo-400 hover:text-indigo-300">
+        change in Gen Config
+      </a>
+    </p>
+  )
+}
+
 export function Dashboard() {
   const navigate = useNavigate()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [selectedJob, setSelectedJob] = useState('')
   const [uploadDone, setUploadDone] = useState(false)
   const [uploadError, setUploadError] = useState(false)
+  const [parseState, setParseState] = useState<'idle' | 'running' | 'done' | 'error'>('idle')
+  const [parseWarnings, setParseWarnings] = useState<string[]>([])
+  const [parseError, setParseError] = useState('')
+  const [parseCount, setParseCount] = useState(0)
+  const [showSteps, setShowSteps] = useState(() => !localStorage.getItem('ats_onboarded'))
 
   const doctor = useQuery({ queryKey: ['doctor'], queryFn: getDoctor })
   const lint = useQuery({ queryKey: ['lint'], queryFn: getLint })
   const jobsQ = useQuery({ queryKey: ['files', 'jobs'], queryFn: listJobFiles })
+  const configQ = useQuery({ queryKey: ['config'], queryFn: getConfig })
 
   const genericBuild = useInlineBuild()
   const jobBuild = useInlineBuild()
-  const mdBuild = useInlineBuild()
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     setUploadDone(false)
     setUploadError(false)
+    setParseState('idle')
+    setParseWarnings([])
+    setParseError('')
+    setParseCount(0)
     try {
       await uploadCvPdf(file)
       setUploadDone(true)
     } catch {
       setUploadError(true)
+    }
+  }
+
+  const handleParseWithAi = async () => {
+    setParseState('running')
+    setParseWarnings([])
+    setParseError('')
+    try {
+      const result = await ingestPdf()
+      setParseCount(result.written.length)
+      setParseWarnings(result.warnings)
+      setParseState('done')
+    } catch (err) {
+      setParseError(err instanceof Error ? err.message : 'Unknown error')
+      setParseState('error')
     }
   }
 
@@ -98,11 +145,9 @@ export function Dashboard() {
     } catch { /* ignore */ }
   }
 
-  const handleMdBuild = async () => {
-    try {
-      const { job_id } = await startBuild({ job: null, llm: 'none' })
-      await mdBuild.run(job_id)
-    } catch { /* ignore */ }
+  const handleDismissSteps = () => {
+    localStorage.setItem('ats_onboarded', '1')
+    setShowSteps(false)
   }
 
   return (
@@ -111,6 +156,49 @@ export function Dashboard() {
         <h1 className="text-2xl font-semibold text-slate-100">Dashboard</h1>
         <p className="mt-1 text-sm text-slate-400">Quick actions to build and manage your CV</p>
       </div>
+
+      {/* Getting Started */}
+      {showSteps && (
+        <section className="rounded-xl border border-indigo-800 bg-indigo-950/30 p-5">
+          <h2 className="mb-3 text-sm font-semibold text-indigo-300">
+            Getting Started — follow these steps for your first CV
+          </h2>
+          <ol className="space-y-2">
+            <li className="flex items-start gap-3">
+              <span className="shrink-0 flex h-6 w-6 items-center justify-center rounded-full bg-indigo-700 text-xs font-bold text-white">1</span>
+              <span className="text-sm text-slate-300">
+                Upload your existing CV (PDF) — use the <strong>Upload my CV</strong> card below
+              </span>
+            </li>
+            <li className="flex items-start gap-3">
+              <span className="shrink-0 flex h-6 w-6 items-center justify-center rounded-full bg-indigo-700 text-xs font-bold text-white">2</span>
+              <span className="text-sm text-slate-300">
+                Review &amp; edit your Profile —{' '}
+                <Link to="/data" className="underline text-indigo-400">go to Profile tab</Link>
+              </span>
+            </li>
+            <li className="flex items-start gap-3">
+              <span className="shrink-0 flex h-6 w-6 items-center justify-center rounded-full bg-indigo-700 text-xs font-bold text-white">3</span>
+              <span className="text-sm text-slate-300">
+                Add target job descriptions —{' '}
+                <Link to="/jobs" className="underline text-indigo-400">go to Target Jobs tab</Link>
+              </span>
+            </li>
+            <li className="flex items-start gap-3">
+              <span className="shrink-0 flex h-6 w-6 items-center justify-center rounded-full bg-indigo-700 text-xs font-bold text-white">4</span>
+              <span className="text-sm text-slate-300">
+                Generate your CVs — use <strong>Build for Job</strong> or <strong>Build Generic CV</strong> cards below
+              </span>
+            </li>
+          </ol>
+          <button
+            onClick={handleDismissSteps}
+            className="mt-4 rounded-lg border border-indigo-700 px-4 py-1.5 text-xs text-indigo-300 hover:bg-indigo-900/40"
+          >
+            Got it, don't show again
+          </button>
+        </section>
+      )}
 
       {/* Quick Start */}
       <section>
@@ -126,6 +214,7 @@ export function Dashboard() {
               <h3 className="font-semibold text-slate-100">Upload my CV (PDF)</h3>
             </Tooltip>
             <p className="mt-1 text-xs text-slate-400">Extract data from an existing PDF</p>
+            <AiProviderNote provider={configQ.data?.basic['CV_AI_PROVIDER']} />
             <input
               ref={fileInputRef}
               type="file"
@@ -133,19 +222,56 @@ export function Dashboard() {
               className="hidden"
               onChange={e => void handleFileChange(e)}
             />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="mt-3 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500"
-            >
-              Choose PDF…
-            </button>
-            {uploadDone && (
-              <p className="mt-2 text-xs text-green-400">
-                Saved!{' '}
-                <button onClick={() => navigate('/data')} className="underline">
-                  Go to Profile →
-                </button>
-              </p>
+            {!uploadDone ? (
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="mt-3 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500"
+              >
+                Choose PDF…
+              </button>
+            ) : (
+              <div className="mt-3 space-y-2">
+                <p className="text-xs text-green-400">✓ Saved</p>
+                {parseState === 'idle' && (
+                  <button
+                    onClick={() => void handleParseWithAi()}
+                    className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500"
+                  >
+                    Parse with AI →
+                  </button>
+                )}
+                {parseState === 'running' && (
+                  <p className="text-xs text-slate-400 animate-pulse">⏳ Parsing your CV…</p>
+                )}
+                {parseState === 'done' && (
+                  <div>
+                    <p className="text-xs text-green-400">
+                      ✓ {parseCount} files created{' '}
+                      <button onClick={() => navigate('/data')} className="underline">
+                        Go to Profile to review →
+                      </button>
+                    </p>
+                    {parseWarnings.length > 0 && (
+                      <ul className="mt-1 space-y-0.5">
+                        {parseWarnings.map((w, i) => (
+                          <li key={i} className="text-xs text-yellow-400">⚠ {w}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+                {parseState === 'error' && (
+                  <div>
+                    <p className="text-xs text-red-400">✗ Parse failed: {parseError}</p>
+                    <button
+                      onClick={() => void handleParseWithAi()}
+                      className="mt-1 rounded bg-slate-700 px-3 py-1 text-xs text-slate-300 hover:bg-slate-600"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
             {uploadError && (
               <p className="mt-2 text-xs text-red-400">Upload failed. Try again.</p>
@@ -206,7 +332,7 @@ export function Dashboard() {
                 className="flex-1 rounded-lg border border-slate-600 bg-slate-800 px-2 py-2 text-sm text-slate-200 outline-none focus:border-indigo-500"
               >
                 <option value="">Select job…</option>
-                {jobsQ.data?.map(f => (
+                {jobsQ.data?.filter(f => f.name.toLowerCase() !== 'readme.md').map(f => (
                   <option key={f.name} value={f.name}>{f.name}</option>
                 ))}
               </select>
@@ -227,31 +353,6 @@ export function Dashboard() {
               </p>
             )}
             <InlineLog lines={jobBuild.state.lines} status={jobBuild.state.status} />
-          </div>
-
-          {/* Build from Markdowns */}
-          <div className="rounded-xl border border-slate-700 bg-slate-900 p-5 sm:col-span-1">
-            <div className="mb-2 text-2xl">📝</div>
-            <Tooltip text="No LLM — uses your existing markdown files directly. Fastest build option.">
-              <h3 className="font-semibold text-slate-100">Build from Markdowns</h3>
-            </Tooltip>
-            <p className="mt-1 text-xs text-slate-400">Use your markdown files as-is</p>
-            <button
-              onClick={() => void handleMdBuild()}
-              disabled={mdBuild.state.status === 'running'}
-              className="mt-3 rounded-lg bg-slate-700 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-slate-600 disabled:opacity-50"
-            >
-              {mdBuild.state.status === 'running' ? 'Building…' : 'Build ⚡'}
-            </button>
-            {mdBuild.state.status === 'done' && (
-              <p className="mt-2 text-xs text-green-400">
-                Done!{' '}
-                <button onClick={() => navigate('/output')} className="underline">
-                  View output →
-                </button>
-              </p>
-            )}
-            <InlineLog lines={mdBuild.state.lines} status={mdBuild.state.status} />
           </div>
 
         </div>

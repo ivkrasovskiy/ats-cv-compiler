@@ -68,10 +68,19 @@ def render_markdown_to_pdf(markdown: str, output_path: Path) -> None:
         pdf.set_font("Helvetica", size=10)
 
     def paragraph(text: str, *, size: int = 10) -> None:
-        _render_rich_line(pdf, text, size=size)
+        pdf.set_font("Helvetica", size=size)
+        pdf.set_x(pdf.l_margin)
+        pdf.multi_cell(
+            0,
+            5,
+            _normalize_pdf_text(text),
+            markdown=True,
+            new_x=XPos.LMARGIN,
+            new_y=YPos.NEXT,
+        )
 
     def bullet(text: str) -> None:
-        _render_rich_line(pdf, f"- {text}", size=10)
+        paragraph(f"- {text}", size=10)
 
     seen_name = False
     seen_contact = False
@@ -123,55 +132,3 @@ def render_markdown_to_pdf(markdown: str, output_path: Path) -> None:
 
 def _normalize_pdf_text(text: str) -> str:
     return normalize_markdown_text(text)
-
-
-def _split_bold(text: str) -> list[tuple[str, bool]]:
-    parts = text.split("**")
-    segments: list[tuple[str, bool]] = []
-    bold = False
-    for part in parts:
-        segments.append((part, bold))
-        bold = not bold
-    return segments
-
-
-def _render_rich_line(pdf: FPDF, text: str, *, size: int) -> None:
-    line_height = 5
-    max_width = pdf.w - pdf.l_margin - pdf.r_margin
-    tokens: list[tuple[str, bool]] = []
-    for segment, is_bold in _split_bold(text):
-        for word in segment.split():
-            tokens.append((word, is_bold))
-
-    line_tokens: list[tuple[str, bool]] = []
-    line_width = 0.0
-
-    for word, is_bold in tokens:
-        token_text = word if not line_tokens else f" {word}"
-        pdf.set_font("Helvetica", style="B" if is_bold else "", size=size)
-        token_width = pdf.get_string_width(_normalize_pdf_text(token_text))
-        if line_tokens and line_width + token_width > max_width:
-            _write_tokens_line(pdf, line_tokens, size=size, line_height=line_height)
-            line_tokens = []
-            line_width = 0.0
-            token_text = word
-            token_width = pdf.get_string_width(_normalize_pdf_text(token_text))
-        line_tokens.append((token_text, is_bold))
-        line_width += token_width
-
-    if line_tokens:
-        _write_tokens_line(pdf, line_tokens, size=size, line_height=line_height)
-
-
-def _write_tokens_line(
-    pdf: FPDF,
-    tokens: list[tuple[str, bool]],
-    *,
-    size: int,
-    line_height: int,
-) -> None:
-    pdf.set_x(pdf.l_margin)
-    for token_text, is_bold in tokens:
-        pdf.set_font("Helvetica", style="B" if is_bold else "", size=size)
-        pdf.write(line_height, _normalize_pdf_text(token_text))
-    pdf.ln(line_height)

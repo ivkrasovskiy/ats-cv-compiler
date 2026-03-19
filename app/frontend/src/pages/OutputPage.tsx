@@ -6,10 +6,12 @@ import {
   renameOutFile,
   buildFromMd,
   buildStreamUrl,
+  startBuild,
 } from '../api/client'
 import type { FileItem } from '../api/client'
 import { FileEditor } from '../components/FileEditor'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { PdfViewer } from '../components/PdfViewer'
 
 type BuildState = { lines: string[]; status: 'idle' | 'running' | 'done' | 'error' }
 
@@ -80,24 +82,39 @@ function groupFiles(files: FileItem[]): { pairs: FilePair[]; unpairedPdfs: FileI
 
 export function OutputPage() {
   const qc = useQueryClient()
+
+  // Right panel state
+  const [rightMode, setRightMode] = useState<'none' | 'pdf' | 'md-view' | 'editor'>('none')
+  const [previewPdf, setPreviewPdf] = useState<string | null>(null)
   const [selectedMd, setSelectedMd] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
+  const [isDirty, setIsDirty] = useState(false)
   const [saved, setSaved] = useState(false)
+
+  // Editor split-view state
+  const [showEditorSplit, setShowEditorSplit] = useState(false)
+  const [pdfVersion, setPdfVersion] = useState(0)
+  const [leftCollapsed, setLeftCollapsed] = useState(false)
+
+  // Dialogs / UI state
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   const [renaming, setRenaming] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const [saveAsDialog, setSaveAsDialog] = useState<{ original: string; copy: string } | null>(null)
+  const [pendingRowSwitch, setPendingRowSwitch] = useState<{ pdf: string | null; md: string | null; mode?: 'editor' | 'md-view' } | null>(null)
+  const [discardCancelDialog, setDiscardCancelDialog] = useState(false)
+  const [regenOpen, setRegenOpen] = useState<string | null>(null)
 
   const listQ = useQuery({ queryKey: ['out'], queryFn: listOutFiles, refetchInterval: 10000 })
 
   const { builds, run: runBuild } = useRowBuild(() => {
     void qc.invalidateQueries({ queryKey: ['out'] })
+    setPdfVersion(v => v + 1)
   })
 
   const mdFileQ = useQuery({
     queryKey: ['out-md', selectedMd],
     queryFn: async () => {
-      // out/ files served via /api/out/{filename}
       const res = await fetch(`/api/out/${selectedMd}`)
       if (!res.ok) throw new Error('Failed to load')
       const text = await res.text()
@@ -119,6 +136,7 @@ export function OutputPage() {
     },
     onSuccess: () => {
       setSaved(true)
+      setIsDirty(false)
       setSaveAsDialog(null)
       void qc.invalidateQueries({ queryKey: ['out'] })
       setTimeout(() => setSaved(false), 2000)
@@ -133,6 +151,8 @@ export function OutputPage() {
       if (selectedMd === deleteTarget) {
         setSelectedMd(null)
         setDraft('')
+        setIsDirty(false)
+        setRightMode('none')
       }
     },
   })
@@ -146,24 +166,114 @@ export function OutputPage() {
     },
   })
 
-  const handleSelectMd = (name: string) => {
-    setSelectedMd(name)
+  const doRowSwitch = (pdf: string | null, md: string | null, mode: 'editor' | 'md-view' = 'editor') => {
+    setShowEditorSplit(false)
+    setLeftCollapsed(false)
+    if (md) {
+      setSelectedMd(md)
+      setDraft('')
+      setIsDirty(false)
+      setSaved(false)
+      setPreviewPdf(pdf)
+      setRightMode(mode)
+    } else {
+      setPreviewPdf(pdf)
+      setRightMode(pdf ? 'pdf' : 'none')
+      setSelectedMd(null)
+      setDraft('')
+      setIsDirty(false)
+      setSaved(false)
+    }
+  }
+
+  const handleRowClick = (pdf: FileItem) => {
+    if (isDirty) {
+      setPendingRowSwitch({ pdf: pdf.name, md: null })
+      return
+    }
+    doRowSwitch(pdf.name, null)
+  }
+
+  const handleViewMd = (md: FileItem) => {
+    if (isDirty) {
+      setPendingRowSwitch({ pdf: previewPdf, md: md.name, mode: 'md-view' })
+      return
+    }
+    setSelectedMd(md.name)
     setDraft('')
+    setIsDirty(false)
     setSaved(false)
+    setRightMode('md-view')
+  }
+
+  const handleEditMd = (md: FileItem) => {
+    if (isDirty && selectedMd !== md.name) {
+      setPendingRowSwitch({ pdf: previewPdf, md: md.name, mode: 'editor' })
+      return
+    }
+    setSelectedMd(md.name)
+    setDraft('')
+    setIsDirty(false)
+    setSaved(false)
+    setRightMode('editor')
   }
 
   if (mdFileQ.data && draft === '' && mdFileQ.data.content) {
     setDraft(mdFileQ.data.content)
   }
 
-  const handleSaveMd = () => {
+  const handleSaveMd = async () => {
     if (!selectedMd) return
     const isLlmGenerated = !selectedMd.includes('_user')
     if (isLlmGenerated) {
       const copyName = selectedMd.replace(/\.md$/, '_user.md')
       setSaveAsDialog({ original: selectedMd, copy: copyName })
+      return
+    }
+    await saveMdMut.mutateAsync({ path: selectedMd, content: draft })
+    // auto-regen and open split view
+    setShowEditorSplit(true)
+    setLeftCollapsed(true)
+    void handleGeneratePdf(selectedMd)
+  }
+
+  const toggleSplit = () => {
+    setShowEditorSplit(s => {
+      const next = !s
+      if (next) setLeftCollapsed(true)   // auto-collapse left when opening split
+      else setLeftCollapsed(false)        // restore left when closing split
+      return next
+    })
+  }
+
+  const handleRegenPreview = async () => {
+    if (!selectedMd) return
+    // save draft first if dirty
+    if (isDirty) {
+      const isLlmGenerated = !selectedMd.includes('_user')
+      if (isLlmGenerated) {
+        // for LLM files, save to _user copy silently
+        const copyName = selectedMd.replace(/\.md$/, '_user.md')
+        await saveMdMut.mutateAsync({ path: copyName, content: draft })
+        setSelectedMd(copyName)
+      } else {
+        await saveMdMut.mutateAsync({ path: selectedMd, content: draft })
+      }
+    }
+    setShowEditorSplit(true)
+    setLeftCollapsed(true)
+    void handleGeneratePdf(selectedMd)
+  }
+
+  const handleCancelEdit = () => {
+    if (isDirty) {
+      setDiscardCancelDialog(true)
     } else {
-      saveMdMut.mutate({ path: selectedMd, content: draft })
+      setShowEditorSplit(false)
+      setLeftCollapsed(false)
+      setSelectedMd(null)
+      setDraft('')
+      setRightMode(previewPdf ? 'pdf' : 'none')
     }
   }
 
@@ -174,14 +284,39 @@ export function OutputPage() {
     } catch { /* ignore */ }
   }
 
+  const handleRegenWithAgents = async (mdName: string) => {
+    try {
+      const { job_id } = await startBuild({ job: null, llm: 'agents' })
+      await runBuild(mdName, job_id)
+    } catch { /* ignore */ }
+  }
+
   const { pairs, unpairedPdfs } = groupFiles(listQ.data ?? [])
 
   return (
     <div className="flex h-[calc(100vh-8rem)] gap-0 overflow-hidden rounded-xl border border-slate-700">
       {/* Left panel */}
-      <div className="w-80 shrink-0 overflow-y-auto border-r border-slate-700 bg-slate-900">
-        <div className="border-b border-slate-700 px-3 py-2 text-xs font-medium uppercase tracking-wide text-slate-400">
-          Generated CVs
+      <div className={`shrink-0 overflow-y-auto border-r border-slate-700 bg-slate-900 transition-[width] duration-200 ${leftCollapsed ? 'w-8' : 'w-64'}`}>
+        {leftCollapsed ? (
+          <div className="flex h-full flex-col items-center pt-2">
+            <button
+              onClick={() => setLeftCollapsed(false)}
+              className="rounded p-1 text-slate-500 hover:text-slate-300"
+              title="Expand file list"
+            >
+              ▶
+            </button>
+          </div>
+        ) : (
+        <><div className="flex items-center justify-between border-b border-slate-700 px-3 py-2">
+          <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Generated CVs</span>
+          <button
+            onClick={() => setLeftCollapsed(true)}
+            className="text-xs text-slate-600 hover:text-slate-400"
+            title="Collapse file list"
+          >
+            ◀
+          </button>
         </div>
 
         {listQ.isLoading && <p className="px-3 py-2 text-xs text-slate-500">Loading…</p>}
@@ -214,7 +349,13 @@ export function OutputPage() {
                   </div>
                 ) : (
                   <>
-                    <span className="flex-1 truncate font-mono text-sm text-slate-200">{base}</span>
+                    <button
+                      className="flex-1 truncate text-left font-mono text-sm text-slate-200 hover:text-indigo-300"
+                      onClick={() => pdf && handleRowClick(pdf)}
+                      title={base}
+                    >
+                      {base}
+                    </button>
                     <button
                       onClick={() => { setRenaming(base); setRenameValue(base) }}
                       className="shrink-0 text-xs text-slate-500 hover:text-slate-300"
@@ -230,29 +371,54 @@ export function OutputPage() {
               <div className="flex flex-wrap gap-1">
                 {md && (
                   <button
-                    onClick={() => handleSelectMd(md.name)}
-                    className={`rounded px-2 py-1 text-xs ${selectedMd === md.name ? 'bg-indigo-700 text-indigo-100' : 'bg-slate-700 text-slate-200 hover:bg-slate-600'}`}
+                    onClick={() => handleViewMd(md)}
+                    className={`rounded px-2 py-1 text-xs ${selectedMd === md.name && rightMode === 'md-view' ? 'bg-slate-600 text-slate-100' : 'bg-slate-700 text-slate-200 hover:bg-slate-600'}`}
+                  >
+                    View MD
+                  </button>
+                )}
+                {md && (
+                  <button
+                    onClick={() => handleEditMd(md)}
+                    className={`rounded px-2 py-1 text-xs ${selectedMd === md.name && rightMode === 'editor' ? 'bg-indigo-700 text-indigo-100' : 'bg-slate-700 text-slate-200 hover:bg-slate-600'}`}
                   >
                     Edit MD
                   </button>
                 )}
                 {md && (
-                  <button
-                    onClick={() => void handleGeneratePdf(md.name)}
-                    disabled={b.status === 'running'}
-                    className="rounded bg-indigo-700 px-2 py-1 text-xs text-indigo-100 hover:bg-indigo-600 disabled:opacity-50"
-                  >
-                    {b.status === 'running' ? '…' : '⚡ PDF'}
-                  </button>
-                )}
-                {pdf && (
-                  <a
-                    href={`/api/out/${pdf.name}`}
-                    download
-                    className="rounded bg-slate-700 px-2 py-1 text-xs text-slate-200 hover:bg-slate-600"
-                  >
-                    ↓ PDF
-                  </a>
+                  <div className="relative flex">
+                    <button
+                      onClick={() => void handleGeneratePdf(md.name)}
+                      disabled={b.status === 'running'}
+                      className="rounded-l bg-indigo-700 px-2 py-1 text-xs text-indigo-100 hover:bg-indigo-600 disabled:opacity-50"
+                    >
+                      {b.status === 'running' ? '…' : 'Regen'}
+                    </button>
+                    <button
+                      onClick={() => setRegenOpen(regenOpen === md.name ? null : md.name)}
+                      className="rounded-r border-l border-indigo-900 bg-indigo-700 px-1 py-1 text-xs text-indigo-100 hover:bg-indigo-600"
+                    >
+                      ▾
+                    </button>
+                    {regenOpen === md.name && (
+                      <div className="absolute right-0 top-full z-50 mt-1 w-56 rounded border border-slate-600 bg-slate-800 shadow-lg">
+                        <button
+                          onClick={() => { void handleGeneratePdf(md.name); setRegenOpen(null) }}
+                          className="block w-full px-3 py-2 text-left hover:bg-slate-700"
+                        >
+                          <div className="text-xs font-medium text-slate-200">From MD only</div>
+                          <div className="mt-0.5 text-xs text-slate-500">Convert the editable markdown to PDF — fast, no AI</div>
+                        </button>
+                        <button
+                          onClick={() => { void handleRegenWithAgents(md.name); setRegenOpen(null) }}
+                          className="block w-full border-t border-slate-700 px-3 py-2 text-left hover:bg-slate-700"
+                        >
+                          <div className="text-xs font-medium text-slate-200">With LLM/agents</div>
+                          <div className="mt-0.5 text-xs text-slate-500">AI rewrites bullets from your profile data, then generates PDF</div>
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 )}
                 <button
                   onClick={() => setDeleteTarget(pdf?.name ?? md?.name ?? '')}
@@ -279,37 +445,126 @@ export function OutputPage() {
             <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">PDF only</p>
             {unpairedPdfs.map(f => (
               <div key={f.name} className="mb-2 flex items-center justify-between">
-                <span className="truncate font-mono text-xs text-slate-400">{f.name}</span>
-                <div className="flex gap-1">
-                  <a href={`/api/out/${f.name}`} download className="rounded bg-slate-700 px-2 py-1 text-xs text-slate-200 hover:bg-slate-600">↓</a>
-                  <button onClick={() => setDeleteTarget(f.name)} className="rounded bg-red-950 px-2 py-1 text-xs text-red-300 hover:bg-red-900">×</button>
-                </div>
+                <button
+                  className="truncate font-mono text-xs text-slate-400 hover:text-indigo-300"
+                  onClick={() => handleRowClick(f)}
+                  title={f.name}
+                >
+                  {f.name}
+                </button>
+                <button
+                  onClick={() => setDeleteTarget(f.name)}
+                  className="rounded bg-red-950 px-2 py-1 text-xs text-red-300 hover:bg-red-900"
+                >
+                  ×
+                </button>
               </div>
             ))}
           </div>
         )}
+        </>)}
       </div>
 
-      {/* Right panel - MD editor */}
+      {/* Right panel */}
       <div className="flex-1 overflow-hidden bg-slate-950">
-        {!selectedMd && (
-          <div className="flex h-full flex-col items-center justify-center gap-2 text-sm text-slate-500">
-            <p>Select "Edit MD" to edit a generated markdown file.</p>
-            <p className="text-xs text-slate-600">Tip: edit source data in Profile → Projects for changes across all CVs.</p>
+        {rightMode === 'none' && (
+          <div className="flex h-full flex-col items-center justify-center gap-2">
+            <p className="text-base text-slate-200">Click a file name to preview its PDF.</p>
+            <p className="text-sm text-slate-400">Tip: click "Edit MD" to edit the source markdown before regenerating.</p>
           </div>
         )}
-        {selectedMd && mdFileQ.isLoading && (
+        {rightMode === 'pdf' && (
+          <div className="h-full overflow-auto p-4">
+            <PdfViewer filename={previewPdf} />
+          </div>
+        )}
+        {rightMode === 'md-view' && selectedMd && mdFileQ.isLoading && (
           <div className="flex h-full items-center justify-center text-sm text-slate-500">Loading…</div>
         )}
-        {selectedMd && mdFileQ.data && (
-          <FileEditor
-            path={selectedMd}
-            content={draft || mdFileQ.data.content}
-            onChange={v => { setDraft(v); setSaved(false) }}
-            onSave={handleSaveMd}
-            saving={saveMdMut.isPending}
-            saved={saved}
-          />
+        {rightMode === 'md-view' && selectedMd && mdFileQ.data && (
+          <div className="flex h-full flex-col">
+            <div className="flex items-center justify-between border-b border-slate-700 px-4 py-2">
+              <span className="font-mono text-sm text-slate-400">{selectedMd}</span>
+              <button
+                onClick={() => handleEditMd({ name: selectedMd, path: selectedMd, size: 0 })}
+                className="rounded bg-indigo-600 px-3 py-1 text-sm text-white hover:bg-indigo-500"
+              >
+                Edit
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto p-4">
+              <pre className="whitespace-pre-wrap font-mono text-xs text-slate-300">{mdFileQ.data.content}</pre>
+            </div>
+          </div>
+        )}
+        {rightMode === 'editor' && selectedMd && mdFileQ.isLoading && (
+          <div className="flex h-full items-center justify-center text-sm text-slate-500">Loading…</div>
+        )}
+        {rightMode === 'editor' && selectedMd && mdFileQ.data && (
+          <div className="flex h-full overflow-hidden">
+            {/* Editor pane */}
+            <div className={`flex flex-col overflow-hidden ${showEditorSplit ? 'w-1/2 border-r border-slate-700' : 'w-full'}`}>
+              <FileEditor
+                path={selectedMd}
+                content={draft || mdFileQ.data.content}
+                onChange={v => { setDraft(v); setIsDirty(true); setSaved(false) }}
+                onSave={() => void handleSaveMd()}
+                onCancel={handleCancelEdit}
+                saving={saveMdMut.isPending}
+                saved={saved}
+                extraActions={
+                  <>
+                    <button
+                      onClick={() => void handleRegenPreview()}
+                      disabled={builds[selectedMd]?.status === 'running'}
+                      className="rounded bg-slate-700 px-2 py-1 text-xs text-slate-300 hover:bg-slate-600 disabled:opacity-50"
+                      title="Save draft and regenerate PDF preview"
+                    >
+                      {builds[selectedMd]?.status === 'running' ? '⟳ Building…' : '⟳ Regen'}
+                    </button>
+                    <button
+                      onClick={toggleSplit}
+                      className={`rounded px-2 py-1 text-xs hover:bg-slate-600 ${showEditorSplit ? 'bg-indigo-800 text-indigo-200' : 'bg-slate-700 text-slate-300'}`}
+                      title={showEditorSplit ? 'Hide PDF panel' : 'Show PDF panel'}
+                    >
+                      {showEditorSplit ? '⊟ PDF' : '⊞ PDF'}
+                    </button>
+                  </>
+                }
+              />
+            </div>
+            {/* PDF preview pane */}
+            {showEditorSplit && (
+              <div className="flex w-1/2 flex-col overflow-hidden">
+                <div className="flex shrink-0 items-center justify-between border-b border-slate-700 px-3 py-2">
+                  <span className="text-xs text-slate-400">
+                    PDF Preview
+                    {isDirty && <span className="ml-2 text-yellow-400">— unsaved changes not reflected</span>}
+                  </span>
+                  {builds[selectedMd]?.status === 'running' && (
+                    <span className="animate-pulse text-xs text-indigo-400">Building…</span>
+                  )}
+                  {builds[selectedMd]?.status === 'done' && (
+                    <span className="text-xs text-green-400">✓ Up to date</span>
+                  )}
+                </div>
+                <div className="flex-1 overflow-hidden">
+                  {previewPdf ? (
+                    <iframe
+                      key={pdfVersion}
+                      src={`/api/out/${previewPdf}?v=${pdfVersion}`}
+                      className="h-full w-full"
+                      title="PDF Preview"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-xs text-slate-500">
+                      No PDF yet — click ⟳ Regen to generate
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </div>
 
@@ -336,6 +591,42 @@ export function OutputPage() {
             saveMdMut.mutate({ path: saveAsDialog.copy, content: draft })
           }}
           onCancel={() => saveMdMut.mutate({ path: saveAsDialog.original, content: draft })}
+        />
+      )}
+
+      {/* Unsaved changes on row switch */}
+      {pendingRowSwitch && (
+        <ConfirmDialog
+          title="Unsaved changes"
+          message="You have unsaved changes. Discard them and switch?"
+          confirmLabel="Discard"
+          cancelLabel="Keep editing"
+          onConfirm={() => {
+            const pr = pendingRowSwitch
+            setPendingRowSwitch(null)
+            doRowSwitch(pr.pdf, pr.md, pr.mode)
+          }}
+          onCancel={() => setPendingRowSwitch(null)}
+        />
+      )}
+
+      {/* Discard changes on cancel */}
+      {discardCancelDialog && (
+        <ConfirmDialog
+          title="Discard changes?"
+          message="Your unsaved changes will be lost."
+          confirmLabel="Discard"
+          cancelLabel="Keep editing"
+          onConfirm={() => {
+            setDiscardCancelDialog(false)
+            setShowEditorSplit(false)
+            setLeftCollapsed(false)
+            setSelectedMd(null)
+            setDraft('')
+            setIsDirty(false)
+            setRightMode(previewPdf ? 'pdf' : 'none')
+          }}
+          onCancel={() => setDiscardCancelDialog(false)}
         />
       )}
     </div>

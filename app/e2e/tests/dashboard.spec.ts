@@ -26,4 +26,10 @@ test.describe('Dashboard', () => {
       await expect(page.getByRole('link', { name: label })).toBeVisible()
     }
   })
+
+  test('shows Getting Started section on first load', async ({ page }) => {
+    await page.evaluate(() => localStorage.removeItem('ats_onboarded'))
+    await page.reload()
+    await expect(page.getByText('Getting Started')).toBeVisible()
+  })
 })

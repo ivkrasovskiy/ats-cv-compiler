@@ -4,7 +4,7 @@ from app.backend.services.file_service import get_project_root
 
 CONFIG_GROUPS = {
     "basic": [
-        "CV_LLM_MODEL",
+        "CV_AI_PROVIDER",
         "CV_AGENT_CHAIN_ENABLED",
         "CV_AGENT_MAX_BULLET_CHARS",
         "CV_AGENT_MAX_SUMMARY_CHARS",
@@ -13,6 +13,7 @@ CONFIG_GROUPS = {
     "advanced_llm": [
         "CV_LLM_BASE_URL",
         "CV_LLM_API_KEY",
+        "CV_LLM_MODEL",
         "CV_LLM_MODE",
         "CV_LLM_TIMEOUT_SECONDS",
     ],

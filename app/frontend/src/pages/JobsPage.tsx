@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   listJobFiles,
@@ -48,6 +49,8 @@ export function JobsPage() {
   const [newName, setNewName] = useState('')
   const [creating, setCreating] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+  const [previewJob, setPreviewJob] = useState<string | null>(null)
+  const [expandedJob, setExpandedJob] = useState<string | null>(null)
 
   const listQ = useQuery({ queryKey: ['files', 'jobs'], queryFn: listJobFiles })
   const outQ = useQuery({ queryKey: ['out'], queryFn: listOutFiles })
@@ -57,6 +60,13 @@ export function JobsPage() {
     queryKey: ['file', 'jobs', editing],
     queryFn: () => getJobFile(editing!),
     enabled: editing !== null,
+    staleTime: Infinity,
+  })
+
+  const expandQ = useQuery({
+    queryKey: ['file', 'jobs', expandedJob],
+    queryFn: () => getJobFile(expandedJob!),
+    enabled: expandedJob !== null,
     staleTime: Infinity,
   })
 
@@ -99,8 +109,10 @@ export function JobsPage() {
     } catch { /* ignore */ }
   }
 
+  const visibleJobs = (listQ.data ?? []).filter(f => f.name.toLowerCase() !== 'readme.md')
+
   const handleGenerateAll = async () => {
-    for (const f of listQ.data ?? []) {
+    for (const f of visibleJobs) {
       await handleGenerate(f.name)
     }
   }
@@ -113,11 +125,28 @@ export function JobsPage() {
           <p className="mt-1 text-sm text-slate-400">
             Add one description per job you're applying to. One job = one tailored CV.
           </p>
+          <p className="mt-1 text-xs text-slate-500">
+            Generated CVs are saved in the{' '}
+            <Link to="/output" className="underline text-indigo-400">Generated CVs</Link>
+            {' '}tab — open it to edit, re-render, or download.
+          </p>
+          <p className="mt-2 text-xs text-slate-500">
+            Files must use the <code className="rounded bg-slate-800 px-1 text-slate-300">.md</code> extension —{' '}
+            <a
+              href="https://www.markdownguide.org/basic-syntax/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline text-indigo-400"
+            >
+              Markdown
+            </a>
+            {' '}is just plain text with optional formatting like <code className="rounded bg-slate-800 px-1 text-slate-300">**bold**</code> or bullet lists. You can paste a raw job description and it works fine as-is.
+          </p>
         </div>
         <div className="flex gap-2">
           <button
             onClick={() => void handleGenerateAll()}
-            disabled={!listQ.data?.length}
+            disabled={!visibleJobs.length}
             className="rounded-lg bg-slate-700 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-slate-600 disabled:opacity-50"
           >
             Generate for All
@@ -135,12 +164,23 @@ export function JobsPage() {
       {creating && (
         <div className="rounded-xl border border-slate-700 bg-slate-900 p-5 space-y-3">
           <h2 className="text-sm font-medium text-slate-300">New Job Description</h2>
-          <input
-            value={newName}
-            onChange={e => setNewName(e.target.value)}
-            placeholder="filename.md (e.g. google_swe.md)"
-            className="w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 outline-none focus:border-indigo-500"
-          />
+          <div>
+            <input
+              value={newName}
+              onChange={e => setNewName(e.target.value)}
+              placeholder="e.g. google_swe.md"
+              className={`w-full rounded-lg border px-3 py-2 text-sm text-slate-200 placeholder-slate-500 outline-none bg-slate-800 ${
+                newName && !newName.endsWith('.md')
+                  ? 'border-red-500 focus:border-red-400'
+                  : 'border-slate-600 focus:border-indigo-500'
+              }`}
+            />
+            {newName && !newName.endsWith('.md') && (
+              <p className="mt-1 text-xs text-red-400">
+                Filename must end in <code className="rounded bg-slate-800 px-1">.md</code> — e.g. <code className="rounded bg-slate-800 px-1">{newName.replace(/\.[^.]*$/, '') || newName}.md</code>
+              </p>
+            )}
+          </div>
           <textarea
             value={draft}
             onChange={e => setDraft(e.target.value)}
@@ -151,7 +191,7 @@ export function JobsPage() {
           <div className="flex gap-2">
             <button
               onClick={() => saveMut.mutate({ name: newName, content: draft })}
-              disabled={!newName || saveMut.isPending}
+              disabled={!newName || !newName.endsWith('.md') || saveMut.isPending}
               className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
             >
               Save
@@ -196,12 +236,12 @@ export function JobsPage() {
 
       {/* Job list */}
       {listQ.isLoading && <p className="text-sm text-slate-500">Loading…</p>}
-      {listQ.data?.length === 0 && !creating && (
+      {visibleJobs.length === 0 && !creating && !listQ.isLoading && (
         <p className="text-sm text-slate-500">No job files yet. Click "+ New Job" to create one.</p>
       )}
-      {listQ.data && listQ.data.length > 0 && (
+      {visibleJobs.length > 0 && (
         <div className="space-y-3">
-          {listQ.data.map(f => {
+          {visibleJobs.map(f => {
             const b = builds[f.name] ?? { lines: [], status: 'idle' }
             return (
               <div
@@ -209,16 +249,27 @@ export function JobsPage() {
                 className="rounded-xl border border-slate-700 bg-slate-900 p-4"
               >
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-slate-400">📄</span>
+                  <button
+                    className="flex items-center gap-2 text-left hover:text-slate-100"
+                    onClick={() => setExpandedJob(expandedJob === f.name ? null : f.name)}
+                  >
+                    <span className="text-slate-400 text-xs">{expandedJob === f.name ? '▼' : '▶'}</span>
                     <span className="font-mono text-sm text-slate-300">{f.name}</span>
                     {hasCv(f.name) && (
                       <span className="text-xs text-green-400">✓ CV generated</span>
                     )}
-                  </div>
+                  </button>
                   <div className="flex gap-2">
+                    {hasCv(f.name) && (
+                      <button
+                        onClick={() => setPreviewJob(previewJob === f.name ? null : f.name)}
+                        className="rounded bg-slate-700 px-3 py-1 text-xs text-slate-200 hover:bg-slate-600"
+                      >
+                        {previewJob === f.name ? 'Hide PDF' : 'PDF Preview'}
+                      </button>
+                    )}
                     <button
-                      onClick={() => { setEditing(f.name); setDraft('') }}
+                      onClick={() => { setEditing(f.name); setDraft(''); setExpandedJob(null) }}
                       className="rounded bg-slate-700 px-3 py-1 text-xs text-slate-200 hover:bg-slate-600"
                     >
                       Edit
@@ -240,11 +291,38 @@ export function JobsPage() {
                     </button>
                   </div>
                 </div>
+                {/* MD content preview */}
+                {expandedJob === f.name && (
+                  <div className="mt-3 rounded-lg border border-slate-700 bg-slate-950">
+                    {expandQ.isLoading ? (
+                      <p className="px-3 py-2 text-xs text-slate-500">Loading…</p>
+                    ) : (
+                      <pre className="max-h-72 overflow-y-auto whitespace-pre-wrap px-4 py-3 font-mono text-xs text-slate-300 leading-relaxed">
+                        {expandQ.data?.content ?? ''}
+                      </pre>
+                    )}
+                  </div>
+                )}
+                {/* PDF preview */}
+                {previewJob === f.name && (
+                  <iframe
+                    src={`/api/out/cv_job_${f.name.replace(/\.md$/, '')}.pdf`}
+                    className="h-64 w-full mt-2 rounded"
+                    title="CV Preview"
+                  />
+                )}
                 {b.status !== 'idle' && (
                   <div className="mt-3 max-h-32 overflow-y-auto rounded bg-slate-950 p-2 font-mono text-xs text-slate-300">
                     {b.lines.map((l, i) => <div key={i}>{l}</div>)}
                     {b.status === 'running' && <div className="animate-pulse text-indigo-400">▌</div>}
-                    {b.status === 'done' && <div className="text-green-400">✓ Done</div>}
+                    {b.status === 'done' && (
+                      <div className="text-green-400">
+                        ✓ Done —{' '}
+                        <Link to="/output" className="underline text-indigo-400">
+                          View in Generated CVs →
+                        </Link>
+                      </div>
+                    )}
                     {b.status === 'error' && <div className="text-red-400">✗ Error</div>}
                   </div>
                 )}
