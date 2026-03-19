@@ -10,10 +10,10 @@ const qc = new QueryClient()
 
 const NAV = [
   { to: '/', label: 'Dashboard', end: true },
-  { to: '/data', label: 'Data', end: false },
-  { to: '/jobs', label: 'Jobs', end: false },
-  { to: '/build', label: 'Build', end: false },
-  { to: '/output', label: 'Output', end: false },
+  { to: '/data', label: 'Profile', end: false },
+  { to: '/jobs', label: 'Target Jobs', end: false },
+  { to: '/build', label: 'Gen Config', end: false },
+  { to: '/output', label: 'Generated CVs', end: false },
 ]
 
 function Nav() {

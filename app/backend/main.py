@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.backend.api import build, doctor, files, health, lint
+from app.backend.api import build, config, doctor, files, health, lint
 
 
 def create_app() -> FastAPI:
@@ -23,6 +23,7 @@ def create_app() -> FastAPI:
     app.include_router(build.router, prefix="/api")
     app.include_router(lint.router, prefix="/api")
     app.include_router(doctor.router, prefix="/api")
+    app.include_router(config.router, prefix="/api")
 
     # Serve built frontend in production (dist must exist)
     dist = Path("app/frontend/dist")

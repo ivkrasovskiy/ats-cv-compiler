@@ -4,7 +4,12 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from app.backend.services.build_service import get_job, get_job_lines, start_build
+from app.backend.services.build_service import (
+    get_job,
+    get_job_lines,
+    start_build,
+    start_build_from_md,
+)
 
 router = APIRouter()
 
@@ -17,6 +22,16 @@ class BuildRequest(BaseModel):
 @router.post("/build", status_code=202)
 def post_build(req: BuildRequest) -> dict:
     job_id = start_build(req.job, req.llm)
+    return {"job_id": job_id}
+
+
+class BuildFromMdRequest(BaseModel):
+    md_path: str
+
+
+@router.post("/build/from-md", status_code=202)
+def post_build_from_md(req: BuildFromMdRequest) -> dict:
+    job_id = start_build_from_md(req.md_path)
     return {"job_id": job_id}
 
 

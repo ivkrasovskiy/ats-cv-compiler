@@ -9,25 +9,20 @@ test.describe('Dashboard', () => {
     await expect(page.locator('header')).toContainText('ats-cv-compiler')
   })
 
-  test('shows System Status section', async ({ page }) => {
-    await expect(page.getByRole('heading', { name: 'System Status' })).toBeVisible()
+  test('shows Quick Start section', async ({ page }) => {
+    await expect(page.getByRole('heading', { name: 'Quick Start' })).toBeVisible()
   })
 
-  test('shows Quick Actions section', async ({ page }) => {
-    await expect(page.getByRole('heading', { name: 'Quick Actions' })).toBeVisible()
+  test('has Build Generic CV card', async ({ page }) => {
+    await expect(page.getByRole('heading', { name: 'Build Generic CV' })).toBeVisible()
   })
 
-  test('has Build Generic CV button', async ({ page }) => {
-    await expect(page.getByRole('button', { name: 'Build Generic CV' })).toBeVisible()
-  })
-
-  test('navigates to Build page from button', async ({ page }) => {
-    await page.getByRole('button', { name: 'Build Generic CV' }).click()
-    await expect(page).toHaveURL('/build')
+  test('has System Status collapsible section', async ({ page }) => {
+    await expect(page.getByText('System Status')).toBeVisible()
   })
 
   test('all nav links are visible', async ({ page }) => {
-    for (const label of ['Dashboard', 'Data', 'Jobs', 'Build', 'Output']) {
+    for (const label of ['Dashboard', 'Profile', 'Target Jobs', 'Gen Config', 'Generated CVs']) {
       await expect(page.getByRole('link', { name: label })).toBeVisible()
     }
   })

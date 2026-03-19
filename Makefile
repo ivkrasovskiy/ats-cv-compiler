@@ -1,4 +1,17 @@
-.PHONY: test test-onboard test-onboard-claude test-onboard-gemini test-onboard-setup lint fmt check
+.PHONY: dev install test test-onboard test-onboard-claude test-onboard-gemini test-onboard-setup lint fmt check
+
+# ── Local web app (backend + frontend) ────────────────────────────────────────
+install:  ## Install Python deps (--extra app) and frontend npm packages
+	uv sync --extra app
+	cd app/frontend && npm install
+
+dev: install  ## Start backend :8000 + frontend dev server :5173  →  open http://localhost:5173
+	@echo "Backend → http://localhost:8000  |  Frontend → http://localhost:5173"
+	@echo "Press Ctrl-C to stop both."
+	@uv run --extra app cv-app & BACK=$$!; \
+	 trap "kill $$BACK 2>/dev/null; wait $$BACK 2>/dev/null" EXIT INT TERM; \
+	 cd app/frontend && npm run dev; \
+	 wait
 
 # ── Unit tests ─────────────────────────────────────────────────────────────────
 test:

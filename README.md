@@ -25,6 +25,29 @@ uv run cv build --job false
 
 ---
 
+## Web UI
+
+A local web interface lets you edit profile data, manage job descriptions, run builds, and download CVs — all from a browser.
+
+**Requires:** Node.js ≥ 18
+
+```bash
+make dev
+```
+
+This installs all dependencies and starts both servers:
+- **Backend API** → http://localhost:8000
+- **Frontend** → http://localhost:5173 ← open this in your browser
+
+Press `Ctrl-C` to stop both.
+
+**First time only (separate install step):**
+```bash
+make install   # uv sync --extra app + npm install
+```
+
+---
+
 A CLI tool that compiles structured career data into ATS-safe CV PDFs, with optional job-specific tailoring using LLMs.
 It also emits a deterministic Markdown CV that serves as the PDF source.
 

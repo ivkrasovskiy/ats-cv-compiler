@@ -30,6 +30,43 @@ def get_job_lines(job_id: str) -> list[str]:
         return list(job["lines"]) if job is not None else []
 
 
+def start_build_from_md(md_path: str) -> str:
+    job_id = str(uuid.uuid4())
+    with _lock:
+        _jobs[job_id] = {"status": "running", "lines": [], "exit_code": None}
+
+    thread = threading.Thread(target=_run_build_from_md, args=(job_id, md_path), daemon=True)
+    thread.start()
+    return job_id
+
+
+def _run_build_from_md(job_id: str, md_path: str) -> None:
+    root = get_project_root()
+    cmd = ["uv", "run", "cv", "build", "--from-markdown", md_path]
+
+    try:
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            cwd=root,
+        )
+        assert proc.stdout is not None
+        for line in proc.stdout:
+            with _lock:
+                _jobs[job_id]["lines"].append(line.rstrip("\n"))
+        proc.wait()
+        with _lock:
+            _jobs[job_id]["status"] = "done"
+            _jobs[job_id]["exit_code"] = proc.returncode
+    except Exception as exc:
+        with _lock:
+            _jobs[job_id]["lines"].append(f"ERROR: {exc}")
+            _jobs[job_id]["status"] = "error"
+            _jobs[job_id]["exit_code"] = 1
+
+
 def _run_build(job_id: str, job_path: str | None, llm: str) -> None:
     root = get_project_root()
     cmd = ["uv", "run", "cv", "build", "--job", job_path or "false"]
