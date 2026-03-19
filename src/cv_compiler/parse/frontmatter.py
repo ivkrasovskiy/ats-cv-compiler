@@ -52,7 +52,16 @@ def parse_markdown_frontmatter(path: Path) -> MarkdownDocument:
     if not yaml_text:
         frontmatter: Mapping[str, Any] = {}
     else:
-        loaded = yaml.safe_load(yaml_text)
+        try:
+            loaded = yaml.safe_load(yaml_text)
+        except yaml.YAMLError as exc:
+            # Strip the generic preamble yaml adds; keep only the location hint.
+            msg = str(exc).split("\n", 1)[0]
+            raise ValueError(
+                f"Invalid YAML in {path.name}: {msg}\n"
+                "Hint: if a URL contains brackets like [text](url), "
+                "remove them and paste the plain URL."
+            ) from exc
         if loaded is None:
             frontmatter = {}
         elif not isinstance(loaded, dict):

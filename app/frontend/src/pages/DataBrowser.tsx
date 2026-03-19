@@ -323,6 +323,7 @@ export function DataBrowser() {
                 onCancel={handleCancelEdit}
                 saving={saveMut.isPending}
                 saved={saved}
+                lang="yaml"
               />
             </div>
           </div>

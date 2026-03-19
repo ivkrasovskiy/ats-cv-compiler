@@ -103,7 +103,7 @@ export function JobsPage() {
 
   const handleGenerate = async (jobName: string) => {
     try {
-      const { job_id } = await startBuild({ job: `jobs/${jobName}`, llm: 'none' })
+      const { job_id } = await startBuild({ job: `jobs/${jobName}`, llm: 'auto' })
       await run(jobName, job_id)
       void qc.invalidateQueries({ queryKey: ['out'] })
     } catch { /* ignore */ }
@@ -268,19 +268,28 @@ export function JobsPage() {
                         {previewJob === f.name ? 'Hide PDF' : 'PDF Preview'}
                       </button>
                     )}
+                    {hasCv(f.name) && (
+                      <a
+                        href={`/api/out/cv_job_${f.name.replace(/\.md$/, '')}.pdf`}
+                        download
+                        className="rounded bg-slate-700 px-3 py-1 text-xs text-slate-200 hover:bg-slate-600"
+                      >
+                        ↓ Download
+                      </a>
+                    )}
                     <button
                       onClick={() => { setEditing(f.name); setDraft(''); setExpandedJob(null) }}
                       className="rounded bg-slate-700 px-3 py-1 text-xs text-slate-200 hover:bg-slate-600"
                     >
                       Edit
                     </button>
-                    <Tooltip text="Runs the full CV pipeline for this job description">
+                    <Tooltip text="Runs AI pipeline with configured provider, falls back to Gemini then deterministic">
                       <button
                         onClick={() => void handleGenerate(f.name)}
                         disabled={b.status === 'running'}
                         className="rounded bg-indigo-700 px-3 py-1 text-xs text-indigo-100 hover:bg-indigo-600 disabled:opacity-50"
                       >
-                        {b.status === 'running' ? '…' : '⚡ Generate CV'}
+                        {b.status === 'running' ? '…' : 'Generate CV'}
                       </button>
                     </Tooltip>
                     <button
@@ -316,14 +325,25 @@ export function JobsPage() {
                     {b.lines.map((l, i) => <div key={i}>{l}</div>)}
                     {b.status === 'running' && <div className="animate-pulse text-indigo-400">▌</div>}
                     {b.status === 'done' && (
-                      <div className="text-green-400">
-                        ✓ Done —{' '}
-                        <Link to="/output" className="underline text-indigo-400">
-                          View in Generated CVs →
+                      <div className="flex flex-wrap items-center gap-3 text-green-400">
+                        <span>✓ Done</span>
+                        <a
+                          href={`/api/out/cv_job_${f.name.replace(/\.md$/, '')}.pdf`}
+                          download
+                          className="rounded bg-green-800 px-3 py-1 text-xs font-medium text-green-100 hover:bg-green-700"
+                        >
+                          ↓ Download PDF
+                        </a>
+                        <Link to="/output" className="text-xs text-indigo-400 underline">
+                          Edit in Generated CVs →
                         </Link>
                       </div>
                     )}
-                    {b.status === 'error' && <div className="text-red-400">✗ Error</div>}
+                    {b.status === 'error' && (
+                      <div className="text-red-400">
+                        ✗ Build failed{b.lines.length === 0 && ' — check that your AI tool (gemini/claude) is installed and authenticated'}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

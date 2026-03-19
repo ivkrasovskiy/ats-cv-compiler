@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   listOutFiles,
@@ -277,16 +278,25 @@ export function OutputPage() {
     }
   }
 
-  const handleGeneratePdf = async (mdName: string) => {
+  // Re-render the edited markdown file directly to PDF (no AI, no pipeline re-run)
+  const handleRerenderMd = async (mdName: string) => {
     try {
       const { job_id } = await buildFromMd(`out/${mdName}`)
       await runBuild(mdName, job_id)
     } catch { /* ignore */ }
   }
 
-  const handleRegenWithAgents = async (mdName: string) => {
+  // Derive the job path from the CV base name, e.g. cv_job_google → jobs/google.md
+  const jobPathForBase = (base: string): string | null => {
+    if (base.startsWith('cv_job_')) return `jobs/${base.replace(/^cv_job_/, '')}.md`
+    return null
+  }
+
+  // Run the full pipeline with auto AI-provider fallback (configured → Gemini → deterministic)
+  const handleGenerateAuto = async (base: string, mdName: string) => {
     try {
-      const { job_id } = await startBuild({ job: null, llm: 'agents' })
+      const jobPath = jobPathForBase(base)
+      const { job_id } = await startBuild({ job: jobPath, llm: 'auto' })
       await runBuild(mdName, job_id)
     } catch { /* ignore */ }
   }
@@ -322,7 +332,11 @@ export function OutputPage() {
         {listQ.isLoading && <p className="px-3 py-2 text-xs text-slate-500">Loading…</p>}
 
         {pairs.length === 0 && unpairedPdfs.length === 0 && !listQ.isLoading && (
-          <p className="px-3 py-4 text-xs text-slate-500">No output files yet. Run a build on the Dashboard.</p>
+          <p className="px-3 py-4 text-xs text-slate-500">
+            No CVs yet.{' '}
+            <Link to="/jobs" className="underline text-indigo-400">Go to Target Jobs</Link>
+            {' '}and click "Generate CV" to create one.
+          </p>
         )}
 
         {pairs.map(({ base, md, pdf }) => {
@@ -388,11 +402,11 @@ export function OutputPage() {
                 {md && (
                   <div className="relative flex">
                     <button
-                      onClick={() => void handleGeneratePdf(md.name)}
+                      onClick={() => void handleGenerateAuto(base, md.name)}
                       disabled={b.status === 'running'}
                       className="rounded-l bg-indigo-700 px-2 py-1 text-xs text-indigo-100 hover:bg-indigo-600 disabled:opacity-50"
                     >
-                      {b.status === 'running' ? '…' : 'Regen'}
+                      {b.status === 'running' ? '…' : 'Generate CV'}
                     </button>
                     <button
                       onClick={() => setRegenOpen(regenOpen === md.name ? null : md.name)}
@@ -401,20 +415,20 @@ export function OutputPage() {
                       ▾
                     </button>
                     {regenOpen === md.name && (
-                      <div className="absolute right-0 top-full z-50 mt-1 w-56 rounded border border-slate-600 bg-slate-800 shadow-lg">
+                      <div className="absolute right-0 top-full z-50 mt-1 w-64 rounded border border-slate-600 bg-slate-800 shadow-lg">
                         <button
-                          onClick={() => { void handleGeneratePdf(md.name); setRegenOpen(null) }}
+                          onClick={() => { void handleGenerateAuto(base, md.name); setRegenOpen(null) }}
                           className="block w-full px-3 py-2 text-left hover:bg-slate-700"
                         >
-                          <div className="text-xs font-medium text-slate-200">From MD only</div>
-                          <div className="mt-0.5 text-xs text-slate-500">Convert the editable markdown to PDF — fast, no AI</div>
+                          <div className="text-xs font-medium text-slate-200">Generate CV</div>
+                          <div className="mt-0.5 text-xs text-slate-500">Run AI pipeline (configured provider → Gemini → original bullets)</div>
                         </button>
                         <button
-                          onClick={() => { void handleRegenWithAgents(md.name); setRegenOpen(null) }}
+                          onClick={() => { void handleRerenderMd(md.name); setRegenOpen(null) }}
                           className="block w-full border-t border-slate-700 px-3 py-2 text-left hover:bg-slate-700"
                         >
-                          <div className="text-xs font-medium text-slate-200">With LLM/agents</div>
-                          <div className="mt-0.5 text-xs text-slate-500">AI rewrites bullets from your profile data, then generates PDF</div>
+                          <div className="text-xs font-medium text-slate-200">Rerender MD→PDF</div>
+                          <div className="mt-0.5 text-xs text-slate-500">Convert the edited markdown to PDF — fast, no AI</div>
                         </button>
                       </div>
                     )}
@@ -434,6 +448,11 @@ export function OutputPage() {
                   {b.lines.slice(-20).map((l, i) => <div key={i}>{l}</div>)}
                   {b.status === 'running' && <div className="animate-pulse text-indigo-400">▌</div>}
                   {b.status === 'done' && <div className="text-green-400">✓ Done</div>}
+                  {b.status === 'error' && (
+                    <div className="text-red-400">
+                      ✗ Build failed{b.lines.length === 0 && ' — check that your AI tool (gemini/claude) is installed and authenticated'}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -468,9 +487,22 @@ export function OutputPage() {
       {/* Right panel */}
       <div className="flex-1 overflow-hidden bg-slate-950">
         {rightMode === 'none' && (
-          <div className="flex h-full flex-col items-center justify-center gap-2">
-            <p className="text-base text-slate-200">Click a file name to preview its PDF.</p>
-            <p className="text-sm text-slate-400">Tip: click "Edit MD" to edit the source markdown before regenerating.</p>
+          <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
+            {pairs.length === 0 && unpairedPdfs.length === 0 && !listQ.isLoading ? (
+              <>
+                <p className="text-base text-slate-300">No CVs generated yet.</p>
+                <p className="text-sm text-slate-500">
+                  Go to{' '}
+                  <Link to="/jobs" className="underline text-indigo-400">Target Jobs</Link>
+                  {' '}and click "Generate CV" to create your first one.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-base text-slate-200">Click a file name to preview its PDF.</p>
+                <p className="text-sm text-slate-400">Tip: click "Edit MD" to edit the source markdown before regenerating.</p>
+              </>
+            )}
           </div>
         )}
         {rightMode === 'pdf' && (
