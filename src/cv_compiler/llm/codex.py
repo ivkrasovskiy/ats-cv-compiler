@@ -129,6 +129,15 @@ class CodexExecProvider(LLMProvider):
         payload = _extract_json_payload(output)
         return parse_skill_highlights(payload, allowed_skills=tuple(skills))
 
+    def select_skills(
+        self,
+        skills_with_scores: Sequence[tuple[str, int, int]],
+        profile: Profile,
+        job: JobSpec,
+    ) -> Sequence[str]:
+        _ = (profile, job)
+        return [s for s, _, __ in skills_with_scores]
+
     def generate_experience_summary(
         self,
         projects: Sequence[ProjectEntry],

@@ -75,6 +75,78 @@ def parse_skill_highlights(text: str, *, allowed_skills: tuple[str, ...]) -> tup
     return tuple(highlights)
 
 
+def build_skills_select_prompt(
+    prompt_path: Path,
+    *,
+    skills_with_scores: tuple[tuple[str, int, int], ...],  # (name, exact, fuzzy)
+    profile: Profile,
+    job: JobSpec,
+) -> str:
+    prompt = prompt_path.read_text(encoding="utf-8")
+    prompt = prompt.replace("{{PROFILE_HEADLINE}}", profile.headline)
+    job_payload = {
+        "id": job.id,
+        "title": job.title,
+        "raw_text": job.raw_text,
+        "keywords": list(job.keywords),
+    }
+    prompt = prompt.replace("{{JOB}}", yaml.safe_dump(job_payload, sort_keys=False).strip())
+    skills_payload = [
+        {"name": name, "exact_matches": exact, "fuzzy_matches": fuzzy}
+        for name, exact, fuzzy in skills_with_scores
+    ]
+    prompt = prompt.replace("{{SKILLS}}", yaml.safe_dump(skills_payload, sort_keys=False).strip())
+    prompt = prompt.replace("{{JOB_CONTEXT}}", "")
+    return prompt
+
+
+def parse_skill_selection(text: str, *, allowed_skills: tuple[str, ...]) -> tuple[str, ...]:
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise ValueError("LLM skill selection response must be valid JSON") from exc
+    if not isinstance(data, dict):
+        raise ValueError("LLM skill selection response must be a JSON object")
+    raw = data.get("selected_skills")
+    if not isinstance(raw, list):
+        raise ValueError("selected_skills must be a list")
+
+    allowed_map = {s.strip().lower(): s for s in allowed_skills if s.strip()}
+    selected: list[str] = []
+    seen: set[str] = set()
+    for item in raw:
+        if not isinstance(item, str):
+            raise ValueError("selected_skills items must be strings")
+        key = item.strip().lower()
+        if not key or key in seen:
+            continue
+        if key not in allowed_map:
+            raise ValueError(f"Unknown skill selected: {item!r}")
+        selected.append(allowed_map[key])
+        seen.add(key)
+    return tuple(selected)
+
+
+def skills_select_schema() -> dict[str, object]:
+    return {
+        "type": "json_schema",
+        "json_schema": {
+            "name": "skills_select_response",
+            "schema": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["selected_skills"],
+                "properties": {
+                    "selected_skills": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                    }
+                },
+            },
+        },
+    }
+
+
 def skills_highlight_schema() -> dict[str, object]:
     return {
         "type": "json_schema",

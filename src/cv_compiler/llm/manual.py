@@ -29,8 +29,11 @@ from cv_compiler.llm.openai import (
 )
 from cv_compiler.llm.skills import (
     build_skills_prompt,
+    build_skills_select_prompt,
     parse_skill_highlights,
+    parse_skill_selection,
     skills_highlight_schema,
+    skills_select_schema,
 )
 from cv_compiler.llm.summary import (
     build_experience_summary_prompt,
@@ -135,6 +138,39 @@ class ManualProvider(LLMProvider):
         raw = self._skills_response_path.read_text(encoding="utf-8")
         content = _extract_response_content(raw)
         return parse_skill_highlights(content, allowed_skills=tuple(skills))
+
+    def select_skills(
+        self,
+        skills_with_scores: Sequence[tuple[str, int, int]],
+        profile: Profile,
+        job: JobSpec,
+    ) -> Sequence[str]:
+        prompt = build_skills_select_prompt(
+            Path("prompts/skills_select_prompt.md"),
+            skills_with_scores=tuple(skills_with_scores),
+            profile=profile,
+            job=job,
+        )
+        payload = build_chat_payload(self._model, prompt, skills_select_schema())
+        request_bundle = {"payload": payload}
+        if self._base_url:
+            request_bundle["endpoint"] = build_chat_endpoint(self._base_url)
+        select_request_path = self._request_path.with_name("llm_skills_select_request.json")
+        select_response_path = self._response_path.with_name("llm_skills_select_response.json")
+        select_request_path.parent.mkdir(parents=True, exist_ok=True)
+        select_request_path.write_text(
+            json.dumps(request_bundle, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        if not select_response_path.exists():
+            raise ValueError(
+                "Manual LLM mode: skill selection response file missing. "
+                f"Paste model output into {select_response_path} and retry."
+            )
+        raw = select_response_path.read_text(encoding="utf-8")
+        content = _extract_response_content(raw)
+        allowed = tuple(s for s, _, __ in skills_with_scores)
+        return parse_skill_selection(content, allowed_skills=allowed)
 
     def generate_experience_summary(
         self,

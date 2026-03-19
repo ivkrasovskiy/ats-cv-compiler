@@ -95,7 +95,13 @@ def build_markdown(
     contact_parts: list[str] = [data.profile.headline, data.profile.location]
     if data.profile.email:
         contact_parts.append(data.profile.email)
-    contact_parts.extend([link.url for link in data.profile.links if link.url])
+    contact_parts.extend(
+        [
+            f"[{link.label}]({link.url})" if link.label else link.url
+            for link in data.profile.links
+            if link.url
+        ]
+    )
     contact_line = " - ".join(part for part in contact_parts if part)
     if contact_line:
         add_line(contact_line)

@@ -18,6 +18,7 @@ from cv_compiler.render.markdown import build_markdown, normalize_markdown_text
 from cv_compiler.render.types import RenderFormat, RenderRequest, RenderResult
 
 _URL_RE = re.compile(r"https?://\S+")
+_MD_LINK_RE = re.compile(r"\[([^\]]+)\]\((https?://[^\)]+)\)")
 
 
 def render_cv(request: RenderRequest) -> RenderResult:
@@ -86,22 +87,34 @@ def render_markdown_to_pdf(markdown: str, output_path: Path) -> None:
         paragraph(f"- {text}", size=10)
 
     def contact_line(text: str) -> None:
-        """Render the contact line with clickable hyperlinks for any URLs."""
+        """Render the contact line with clickable hyperlinks for [label](url) and bare URLs."""
         pdf.set_font("Helvetica", size=11)
         pdf.set_x(pdf.l_margin)
         normalized = _normalize_pdf_text(text)
-        last = 0
-        for m in _URL_RE.finditer(normalized):
-            start, end = m.span()
-            if start > last:
-                pdf.write(5, normalized[last:start])
-            url = m.group(0)
-            pdf.set_text_color(60, 80, 200)
-            pdf.write(5, url, link=url)
-            pdf.set_text_color(0, 0, 0)
-            last = end
-        if last < len(normalized):
-            pdf.write(5, normalized[last:])
+        # Split on [label](url) patterns first; groups give [text, label, url, text, ...]
+        parts = _MD_LINK_RE.split(normalized)
+        for i in range(0, len(parts), 3):
+            segment = parts[i]
+            # Render plain text segment, highlighting any bare URLs
+            last = 0
+            for m in _URL_RE.finditer(segment):
+                start, end = m.span()
+                if start > last:
+                    pdf.write(5, segment[last:start])
+                url = m.group(0)
+                pdf.set_text_color(60, 80, 200)
+                pdf.write(5, url, link=url)
+                pdf.set_text_color(0, 0, 0)
+                last = end
+            if last < len(segment):
+                pdf.write(5, segment[last:])
+            # Render [label](url) pair that follows this segment (if any)
+            if i + 2 < len(parts):
+                label = parts[i + 1]
+                url = parts[i + 2]
+                pdf.set_text_color(60, 80, 200)
+                pdf.write(5, label, link=url)
+                pdf.set_text_color(0, 0, 0)
         pdf.ln(5)
 
     seen_name = False

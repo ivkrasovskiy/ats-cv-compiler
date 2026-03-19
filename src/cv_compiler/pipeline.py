@@ -195,12 +195,30 @@ def build_cv(request: BuildRequest) -> BuildResult:
                         )
                     )
     if job is not None:
-        categories = tuple((cat.name, cat.items) for cat in data.skills.categories)
-        skills_filter = _deterministic_skill_filter(
-            categories,
-            job,
-            preferred=highlighted_skills,
-        )
+        if request.llm is not None:
+            try:
+                all_skills_flat = tuple(
+                    item for cat in data.skills.categories for item in cat.items
+                )
+                kw_set = _job_keyword_set(job)
+                scored = [(s, *_fuzzy_skill_score(s, kw_set)) for s in all_skills_flat]
+                skills_filter = tuple(request.llm.select_skills(scored, data.profile, job))
+            except Exception as exc:  # noqa: BLE001
+                issues.append(
+                    LintIssue(
+                        code="LLM_SKILL_SELECT_FAILED",
+                        message=str(exc),
+                        severity=Severity.WARNING,
+                        source_path=None,
+                    )
+                )
+        if not skills_filter:
+            categories = tuple((cat.name, cat.items) for cat in data.skills.categories)
+            skills_filter = _deterministic_skill_filter(
+                categories,
+                job,
+                preferred=highlighted_skills,
+            )
         if not highlighted_skills:
             all_skills = tuple(item for cat in data.skills.categories for item in cat.items)
             highlighted_skills = _deterministic_skill_highlights(all_skills, job)
@@ -292,6 +310,19 @@ def _load_experience_summary(path: Path) -> str:
     return raw.strip()
 
 
+def _fuzzy_skill_score(skill: str, job_keyword_set: set[str]) -> tuple[int, int]:
+    """Return (exact_token_matches, fuzzy_substring_matches) for a skill against job keywords."""
+    skill_tokens = _tokenize_skill(skill)
+    exact = sum(1 for t in skill_tokens if t in job_keyword_set)
+    fuzzy = 0
+    for st in skill_tokens:
+        if st in job_keyword_set:
+            continue
+        if any(st in jt or jt in st for jt in job_keyword_set):
+            fuzzy += 1
+    return exact, fuzzy
+
+
 def _deterministic_skill_filter(
     categories: tuple[tuple[str, tuple[str, ...]], ...],
     job: JobSpec,
@@ -319,8 +350,8 @@ def _deterministic_skill_filter(
                 key = skill.strip().lower()
                 if not key or key in seen:
                     continue
-                tokens = _tokenize_skill(skill)
-                score = len(tokens & keyword_set)
+                exact, fuzzy = _fuzzy_skill_score(skill, keyword_set)
+                score = exact * 2 + fuzzy
                 if score > 0:
                     scored.append((score, idx, skill))
             scored.sort(key=lambda t: (-t[0], t[1], t[2].lower()))

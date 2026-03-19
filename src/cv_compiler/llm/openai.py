@@ -102,6 +102,15 @@ class OpenAIProvider(LLMProvider):
         )
         return parse_skill_highlights(content, allowed_skills=tuple(skills))
 
+    def select_skills(
+        self,
+        skills_with_scores: Sequence[tuple[str, int, int]],
+        profile: Profile,
+        job: JobSpec,
+    ) -> Sequence[str]:
+        _ = (profile, job)
+        return [s for s, _, __ in skills_with_scores]
+
     def generate_experience_summary(
         self,
         projects: Sequence[ProjectEntry],
@@ -167,7 +176,9 @@ def request_chat_completion(
             raise ValueError("Unexpected LLM response shape")
         return content
 
-    raise RuntimeError(f"LLM request failed after {len(_HTTP_RETRY_DELAYS) + 1} attempts: {last_exc}")
+    raise RuntimeError(
+        f"LLM request failed after {len(_HTTP_RETRY_DELAYS) + 1} attempts: {last_exc}"
+    )
 
 
 def build_chat_endpoint(base_url: str) -> str:

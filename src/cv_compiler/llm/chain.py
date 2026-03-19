@@ -36,13 +36,19 @@ from cv_compiler.llm.job_analysis import (
     parse_job_analysis,
     write_job_analysis,
 )
-from cv_compiler.llm.skills import build_skills_prompt, parse_skill_highlights
+from cv_compiler.llm.skills import (
+    build_skills_prompt,
+    build_skills_select_prompt,
+    parse_skill_highlights,
+    parse_skill_selection,
+)
 from cv_compiler.llm.summary import build_experience_summary_prompt, parse_experience_summary
 from cv_compiler.schema.models import JobSpec, Profile, ProjectEntry
 
 _JOB_ANALYSIS_PROMPT_PATH = Path("prompts/agents/job_analysis_prompt.md")
 _EXPERIENCE_PROMPT_PATH = Path("prompts/experience_prompt.md")
 _SKILLS_PROMPT_PATH = Path("prompts/skills_highlight_prompt.md")
+_SKILLS_SELECT_PROMPT_PATH = Path("prompts/skills_select_prompt.md")
 _SUMMARY_PROMPT_PATH = Path("prompts/experience_summary_prompt.md")
 _TEMPLATES_PATH = Path("prompts/experience_templates.yaml")
 
@@ -146,6 +152,26 @@ class AgentChainProvider:
                 )
 
         return highlighted
+
+    def select_skills(
+        self,
+        skills_with_scores: Sequence[tuple[str, int, int]],
+        profile: Profile,
+        job: JobSpec,
+    ) -> Sequence[str]:
+        job_analysis = self._ensure_job_analysis(job)
+
+        prompt = build_skills_select_prompt(
+            _SKILLS_SELECT_PROMPT_PATH,
+            skills_with_scores=tuple(skills_with_scores),
+            profile=profile,
+            job=job,
+        )
+        prompt = _inject_job_context(prompt, job_analysis)
+        output = self._run_agent(prompt, timeout=self._config.timeout_skills)
+        payload = _extract_json_payload(output)
+        allowed = tuple(s for s, _, __ in skills_with_scores)
+        return parse_skill_selection(payload, allowed_skills=allowed)
 
     def generate_experience_summary(
         self,

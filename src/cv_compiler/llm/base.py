@@ -64,6 +64,13 @@ class LLMProvider(Protocol):
         job: JobSpec | None,
     ) -> Sequence[str]: ...
 
+    def select_skills(
+        self,
+        skills_with_scores: Sequence[tuple[str, int, int]],  # (name, exact, fuzzy)
+        profile: Profile,
+        job: JobSpec,
+    ) -> Sequence[str]: ...
+
     def generate_experience_summary(
         self,
         projects: Sequence[ProjectEntry],
@@ -99,6 +106,15 @@ class NoopProvider:
     ) -> Sequence[str]:
         _ = (skills, profile, job)
         return []
+
+    def select_skills(
+        self,
+        skills_with_scores: Sequence[tuple[str, int, int]],
+        profile: Profile,
+        job: JobSpec,
+    ) -> Sequence[str]:
+        _ = (profile, job)
+        return [s for s, _, __ in skills_with_scores]
 
     def generate_experience_summary(
         self,

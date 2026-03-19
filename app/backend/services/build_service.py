@@ -13,6 +13,7 @@ _LLM_FAIL_MARKERS = frozenset(
     [
         "LLM_GENERATION_FAILED",
         "LLM_SKILL_HIGHLIGHT_FAILED",
+        "LLM_SKILL_SELECT_FAILED",
         "LLM_SUMMARY_FAILED",
     ]
 )
