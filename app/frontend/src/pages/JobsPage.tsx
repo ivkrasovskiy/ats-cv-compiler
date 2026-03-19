@@ -8,39 +8,12 @@ import {
   deleteJobFile,
   listOutFiles,
   startBuild,
-  buildStreamUrl,
 } from '../api/client'
 import type { FileItem } from '../api/client'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { Tooltip } from '../components/Tooltip'
-
-type BuildState = { lines: string[]; status: 'idle' | 'running' | 'done' | 'error' }
-
-function useRowBuild() {
-  const [builds, setBuilds] = useState<Record<string, BuildState>>({})
-
-  const run = async (key: string, jobId: string) => {
-    setBuilds(prev => ({ ...prev, [key]: { lines: [], status: 'running' } }))
-    const src = new EventSource(buildStreamUrl(jobId))
-    src.onmessage = (e) => {
-      if (e.data === '[DONE]') {
-        src.close()
-        setBuilds(prev => ({ ...prev, [key]: { ...prev[key], status: 'done' } }))
-      } else {
-        setBuilds(prev => ({
-          ...prev,
-          [key]: { ...prev[key], lines: [...(prev[key]?.lines ?? []), e.data] },
-        }))
-      }
-    }
-    src.onerror = () => {
-      src.close()
-      setBuilds(prev => ({ ...prev, [key]: { ...prev[key], status: 'error' } }))
-    }
-  }
-
-  return { builds, run }
-}
+import { useBuildRun } from '../hooks/useBuildRun'
+import { BuildProgress } from '../components/BuildProgress'
 
 export function JobsPage() {
   const qc = useQueryClient()
@@ -54,7 +27,7 @@ export function JobsPage() {
 
   const listQ = useQuery({ queryKey: ['files', 'jobs'], queryFn: listJobFiles })
   const outQ = useQuery({ queryKey: ['out'], queryFn: listOutFiles })
-  const { builds, run } = useRowBuild()
+  const { builds, run } = useBuildRun()
 
   const editQ = useQuery({
     queryKey: ['file', 'jobs', editing],
@@ -321,12 +294,10 @@ export function JobsPage() {
                   />
                 )}
                 {b.status !== 'idle' && (
-                  <div className="mt-3 max-h-32 overflow-y-auto rounded bg-slate-950 p-2 font-mono text-xs text-slate-300">
-                    {b.lines.map((l, i) => <div key={i}>{l}</div>)}
-                    {b.status === 'running' && <div className="animate-pulse text-indigo-400">▌</div>}
-                    {b.status === 'done' && (
-                      <div className="flex flex-wrap items-center gap-3 text-green-400">
-                        <span>✓ Done</span>
+                  <BuildProgress
+                    build={b}
+                    doneExtra={
+                      <div className="flex flex-wrap items-center gap-2 mt-1">
                         <a
                           href={`/api/out/cv_job_${f.name.replace(/\.md$/, '')}.pdf`}
                           download
@@ -338,13 +309,8 @@ export function JobsPage() {
                           Edit in Generated CVs →
                         </Link>
                       </div>
-                    )}
-                    {b.status === 'error' && (
-                      <div className="text-red-400">
-                        ✗ Build failed{b.lines.length === 0 && ' — check that your AI tool (gemini/claude) is installed and authenticated'}
-                      </div>
-                    )}
-                  </div>
+                    }
+                  />
                 )}
               </div>
             )

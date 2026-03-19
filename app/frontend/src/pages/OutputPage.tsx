@@ -6,42 +6,14 @@ import {
   deleteOutFile,
   renameOutFile,
   buildFromMd,
-  buildStreamUrl,
   startBuild,
 } from '../api/client'
 import type { FileItem } from '../api/client'
 import { FileEditor } from '../components/FileEditor'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { PdfViewer } from '../components/PdfViewer'
-
-type BuildState = { lines: string[]; status: 'idle' | 'running' | 'done' | 'error' }
-
-function useRowBuild(onDone: () => void) {
-  const [builds, setBuilds] = useState<Record<string, BuildState>>({})
-
-  const run = async (key: string, jobId: string) => {
-    setBuilds(prev => ({ ...prev, [key]: { lines: [], status: 'running' } }))
-    const src = new EventSource(buildStreamUrl(jobId))
-    src.onmessage = (e) => {
-      if (e.data === '[DONE]') {
-        src.close()
-        setBuilds(prev => ({ ...prev, [key]: { ...prev[key], status: 'done' } }))
-        onDone()
-      } else {
-        setBuilds(prev => ({
-          ...prev,
-          [key]: { ...prev[key], lines: [...(prev[key]?.lines ?? []), e.data] },
-        }))
-      }
-    }
-    src.onerror = () => {
-      src.close()
-      setBuilds(prev => ({ ...prev, [key]: { ...prev[key], status: 'error' } }))
-    }
-  }
-
-  return { builds, run }
-}
+import { useBuildRun } from '../hooks/useBuildRun'
+import { BuildProgress } from '../components/BuildProgress'
 
 interface FilePair {
   base: string
@@ -108,9 +80,11 @@ export function OutputPage() {
 
   const listQ = useQuery({ queryKey: ['out'], queryFn: listOutFiles, refetchInterval: 10000 })
 
-  const { builds, run: runBuild } = useRowBuild(() => {
+  const { builds, run } = useBuildRun()
+  const runBuild = (key: string, jobId: string) => run(key, jobId, () => {
     void qc.invalidateQueries({ queryKey: ['out'] })
     setPdfVersion(v => v + 1)
+  })
   })
 
   const mdFileQ = useQuery({
@@ -442,18 +416,8 @@ export function OutputPage() {
                 </button>
               </div>
 
-              {/* Inline build log */}
               {b.status !== 'idle' && (
-                <div className="mt-2 max-h-24 overflow-y-auto rounded bg-slate-950 p-2 font-mono text-xs text-slate-300">
-                  {b.lines.slice(-20).map((l, i) => <div key={i}>{l}</div>)}
-                  {b.status === 'running' && <div className="animate-pulse text-indigo-400">▌</div>}
-                  {b.status === 'done' && <div className="text-green-400">✓ Done</div>}
-                  {b.status === 'error' && (
-                    <div className="text-red-400">
-                      ✗ Build failed{b.lines.length === 0 && ' — check that your AI tool (gemini/claude) is installed and authenticated'}
-                    </div>
-                  )}
-                </div>
+                <BuildProgress build={b} className="mt-2" />
               )}
             </div>
           )

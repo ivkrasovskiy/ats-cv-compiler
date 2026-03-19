@@ -149,9 +149,11 @@ def _run_build_auto(job_id: str, job_path: str | None) -> None:
     root = get_project_root()
     chain = _provider_chain(root)
     ai_providers = chain[:-1]  # all except the no-AI fallback
+    total_steps = len(chain)   # AI providers + 1 deterministic fallback
 
-    for display_name, codex_cmd in ai_providers:
-        _append_line(job_id, f"[→] Trying {display_name}…")
+    for step, (display_name, codex_cmd) in enumerate(ai_providers, start=1):
+        # [STEP M/N] lines are parsed by the frontend as progress markers (not shown in log)
+        _append_line(job_id, f"[STEP {step}/{total_steps}] {display_name}")
         env = dict(os.environ)
         if codex_cmd:
             env["CV_CODEX_CMD"] = codex_cmd
@@ -160,22 +162,22 @@ def _run_build_auto(job_id: str, job_path: str | None) -> None:
         lines, exit_code = _run_subprocess_streaming(job_id, root, cmd, env)
 
         if exit_code != 0:
-            _append_line(job_id, f"[⚠] {display_name} failed (exit {exit_code}) — trying next…")
+            _append_line(job_id, f"[⚠] {display_name} failed (exit {exit_code})")
             continue
 
         failed = [ln for ln in lines if any(m in ln for m in _LLM_FAIL_MARKERS)]
         if failed:
             reason = failed[-1].split(":", 2)[-1].strip()
-            _append_line(job_id, f"[⚠] {display_name} AI call failed: {reason}")
-            _append_line(job_id, "[→] Trying next provider…")
+            _append_line(job_id, f"[⚠] {display_name}: {reason}")
             continue
 
         # AI succeeded
         _finish(job_id, 0)
         return
 
-    # All AI providers failed — run deterministic pipeline
-    _append_line(job_id, "[→] All AI providers unavailable. Running deterministic pipeline…")
+    # All AI providers failed — deterministic fallback
+    _append_line(job_id, f"[STEP {total_steps}/{total_steps}] Deterministic pipeline")
+    _append_line(job_id, "[→] All AI providers unavailable — using your original bullets.")
     cmd = ["uv", "run", "cv", "build", "--job", job_path or "false"]
     _, exit_code = _run_subprocess_streaming(job_id, root, cmd)
     _finish(job_id, exit_code)
