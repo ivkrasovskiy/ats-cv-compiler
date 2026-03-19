@@ -85,7 +85,6 @@ export function OutputPage() {
     void qc.invalidateQueries({ queryKey: ['out'] })
     setPdfVersion(v => v + 1)
   })
-  })
 
   const mdFileQ = useQuery({
     queryKey: ['out-md', selectedMd],
