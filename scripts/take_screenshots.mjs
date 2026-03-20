@@ -61,9 +61,13 @@ async function main() {
       console.warn('[!] Build failed — output page may be empty\n', e.stderr?.toString().slice(0, 300))
     }
 
-    // ── 2. Start backend ────────────────────────────────────────────────────
+    // ── 2. Start backend (no reload — reload uses multiprocessing spawn on
+    //       macOS which doesn't inherit env vars into the worker process) ─────
     console.log('[…] Starting backend…')
-    const backend = spawn('uv', ['run', '--extra', 'app', 'cv-app'], {
+    const backend = spawn('uv', [
+      'run', '--extra', 'app', 'python', '-c',
+      'import uvicorn; uvicorn.run("app.backend.main:app", host="0.0.0.0", port=8000, reload=False)',
+    ], {
       env: { ...process.env, CV_PROJECT_ROOT: root },
       stdio: 'pipe',
     })
