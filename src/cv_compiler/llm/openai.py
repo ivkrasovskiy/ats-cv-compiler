@@ -37,7 +37,7 @@ from cv_compiler.llm.summary import (
     experience_summary_schema,
     parse_experience_summary,
 )
-from cv_compiler.schema.models import JobSpec, Profile, ProjectEntry
+from cv_compiler.schema.models import ExperienceEntry, JobSpec, Profile, ProjectEntry
 
 
 class OpenAIProvider(LLMProvider):
@@ -127,6 +127,15 @@ class OpenAIProvider(LLMProvider):
             response_format=experience_summary_schema(),
         )
         return parse_experience_summary(content)
+
+    def generate_cover_letter(
+        self,
+        profile: Profile,
+        experience: Sequence[ExperienceEntry],
+        job: JobSpec,
+    ) -> str:
+        _ = (profile, experience, job)
+        return ""
 
 
 # HTTP status codes that indicate a transient server-side issue worth retrying.

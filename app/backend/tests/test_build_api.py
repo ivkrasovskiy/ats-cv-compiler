@@ -43,3 +43,12 @@ def test_build_completes_and_has_exit_code(client):
 
     assert status["status"] in ("done", "error")
     assert status["exit_code"] is not None
+
+
+def test_build_with_cover_letter_flag_returns_202(client):
+    """POST /api/build with cover_letter: true should be accepted."""
+    r = client.post("/api/build", json={"job": None, "llm": "none", "cover_letter": True})
+    assert r.status_code == 202
+    data = r.json()
+    assert "job_id" in data
+    assert len(data["job_id"]) == 36

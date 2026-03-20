@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useMemo, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -10,6 +11,7 @@ import {
 } from '../api/client'
 import type { FileItem } from '../api/client'
 import { FileEditor } from '../components/FileEditor'
+import { CvSectionEditor } from '../components/CvSectionEditor'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { PdfViewer } from '../components/PdfViewer'
 import { useBuildRun } from '../hooks/useBuildRun'
@@ -19,14 +21,20 @@ interface FilePair {
   base: string
   md: FileItem | null
   pdf: FileItem | null
+  coverLetter: FileItem | null
 }
 
 function groupFiles(files: FileItem[]): { pairs: FilePair[]; unpairedPdfs: FileItem[] } {
   const mdMap = new Map<string, FileItem>()
   const pdfMap = new Map<string, FileItem>()
+  const coverLetterMap = new Map<string, FileItem>()
 
   for (const f of files) {
-    if (f.name.endsWith('.md')) {
+    if (f.name.startsWith('cover_letter_') && f.name.endsWith('.md')) {
+      // cover_letter_<base>.md — key is the cv base name (cv_<base>)
+      const clBase = f.name.replace(/^cover_letter_/, '').replace(/\.md$/, '')
+      coverLetterMap.set(clBase, f)
+    } else if (f.name.endsWith('.md')) {
       mdMap.set(f.name.replace(/\.md$/, ''), f)
     } else if (f.name.endsWith('.pdf')) {
       pdfMap.set(f.name.replace(/\.pdf$/, ''), f)
@@ -40,17 +48,70 @@ function groupFiles(files: FileItem[]): { pairs: FilePair[]; unpairedPdfs: FileI
   for (const base of allBases) {
     const md = mdMap.get(base) ?? null
     const pdf = pdfMap.get(base) ?? null
+    // For cv_<jobBase>, look up cover_letter_<jobBase>.md
+    const cvJobBase = base.startsWith('cv_') ? base.replace(/^cv_/, '') : null
+    const coverLetter = cvJobBase ? (coverLetterMap.get(cvJobBase) ?? null) : null
     if (md || pdf) {
       if (!md && pdf) {
         unpairedPdfs.push(pdf)
       } else {
-        pairs.push({ base, md, pdf })
+        pairs.push({ base, md, pdf, coverLetter })
       }
     }
   }
 
   pairs.sort((a, b) => a.base.localeCompare(b.base))
   return { pairs, unpairedPdfs }
+}
+
+function MdViewPanel({ selectedMd, content, onEdit }: { selectedMd: string; content: string; onEdit: () => void }) {
+  const [preview, setPreview] = useState(false)
+
+  // Minimal markdown → HTML rendering (headers, bold, italic, lists, paragraphs)
+  const renderMarkdown = (md: string): string => {
+    return md
+      .replace(/^---[\s\S]*?---\n*/m, '') // strip frontmatter
+      .replace(/^### (.+)$/gm, '<h3 style="font-size:1rem;font-weight:600;margin:1em 0 0.25em">$1</h3>')
+      .replace(/^## (.+)$/gm, '<h2 style="font-size:1.15rem;font-weight:700;margin:1.25em 0 0.25em">$1</h2>')
+      .replace(/^# (.+)$/gm, '<h1 style="font-size:1.3rem;font-weight:700;margin:1.5em 0 0.25em">$1</h1>')
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      .replace(/^- (.+)$/gm, '<li style="margin-left:1.5em;list-style:disc">$1</li>')
+      .replace(/\n\n/g, '</p><p style="margin:0.75em 0">')
+      .replace(/^(?!<[hlp])(.+)$/gm, '$1')
+  }
+
+  return (
+    <div className="flex h-full flex-col">
+      <div className="flex items-center justify-between border-b border-slate-700 px-4 py-2">
+        <span className="font-mono text-sm text-slate-400">{selectedMd}</span>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setPreview(p => !p)}
+            className={`rounded px-3 py-1 text-xs ${preview ? 'bg-indigo-700 text-indigo-100' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}
+          >
+            {preview ? 'Raw' : 'Preview'}
+          </button>
+          <button
+            onClick={onEdit}
+            className="rounded bg-indigo-600 px-3 py-1 text-sm text-white hover:bg-indigo-500"
+          >
+            Edit
+          </button>
+        </div>
+      </div>
+      <div className="flex-1 overflow-auto p-4">
+        {preview ? (
+          <div
+            className="text-sm text-slate-200 leading-relaxed"
+            dangerouslySetInnerHTML={{ __html: `<p style="margin:0.75em 0">${renderMarkdown(content)}</p>` }}
+          />
+        ) : (
+          <pre className="whitespace-pre-wrap font-mono text-xs text-slate-300">{content}</pre>
+        )}
+      </div>
+    </div>
+  )
 }
 
 export function OutputPage() {
@@ -64,6 +125,9 @@ export function OutputPage() {
   const [isDirty, setIsDirty] = useState(false)
   const [saved, setSaved] = useState(false)
 
+  // Editor mode: sections (default) vs raw
+  const [sectionMode, setSectionMode] = useState(true)
+
   // Editor split-view state
   const [showEditorSplit, setShowEditorSplit] = useState(false)
   const [pdfVersion, setPdfVersion] = useState(0)
@@ -76,7 +140,7 @@ export function OutputPage() {
   const [saveAsDialog, setSaveAsDialog] = useState<{ original: string; copy: string } | null>(null)
   const [pendingRowSwitch, setPendingRowSwitch] = useState<{ pdf: string | null; md: string | null; mode?: 'editor' | 'md-view' } | null>(null)
   const [discardCancelDialog, setDiscardCancelDialog] = useState(false)
-  const [regenOpen, setRegenOpen] = useState<string | null>(null)
+  const [regenDropdown, setRegenDropdown] = useState<{ pair: FilePair; md: string; top: number; left: number } | null>(null)
 
   const listQ = useQuery({ queryKey: ['out'], queryFn: listOutFiles, refetchInterval: 10000 })
 
@@ -274,7 +338,11 @@ export function OutputPage() {
     } catch { /* ignore */ }
   }
 
-  const { pairs, unpairedPdfs } = groupFiles(listQ.data ?? [])
+  const { pairs, unpairedPdfs } = useMemo(() => groupFiles(listQ.data ?? []), [listQ.data])
+
+  const handleEditorChange = useCallback((v: string) => {
+    setDraft(v); setIsDirty(true); setSaved(false)
+  }, [])
 
   return (
     <div className="flex h-[calc(100vh-8rem)] gap-0 overflow-hidden rounded-xl border border-slate-700">
@@ -312,7 +380,7 @@ export function OutputPage() {
           </p>
         )}
 
-        {pairs.map(({ base, md, pdf }) => {
+        {pairs.map(({ base, md, pdf, coverLetter }) => {
           const b = builds[md?.name ?? ''] ?? { lines: [], status: 'idle' }
           return (
             <div key={base} className="border-b border-slate-800 px-3 py-3">
@@ -356,6 +424,15 @@ export function OutputPage() {
 
               {/* Actions */}
               <div className="flex flex-wrap gap-1">
+                {coverLetter && (
+                  <button
+                    onClick={() => handleViewMd(coverLetter)}
+                    className="rounded px-2 py-1 text-xs bg-slate-700 text-slate-200 hover:bg-slate-600"
+                    title="View cover letter"
+                  >
+                    Cover letter
+                  </button>
+                )}
                 {md && (
                   <button
                     onClick={() => handleViewMd(md)}
@@ -373,7 +450,7 @@ export function OutputPage() {
                   </button>
                 )}
                 {md && (
-                  <div className="relative flex">
+                  <div className="flex">
                     <button
                       onClick={() => void handleGenerateAuto(base, md.name)}
                       disabled={b.status === 'running'}
@@ -382,29 +459,17 @@ export function OutputPage() {
                       {b.status === 'running' ? '…' : 'Generate CV'}
                     </button>
                     <button
-                      onClick={() => setRegenOpen(regenOpen === md.name ? null : md.name)}
+                      onClick={e => {
+                        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                        const pair = { base, md, pdf, coverLetter }
+                        setRegenDropdown(prev =>
+                          prev?.md === md.name ? null : { pair, md: md.name, top: rect.bottom + 4, left: rect.left - 192 }
+                        )
+                      }}
                       className="rounded-r border-l border-indigo-900 bg-indigo-700 px-1 py-1 text-xs text-indigo-100 hover:bg-indigo-600"
                     >
                       ▾
                     </button>
-                    {regenOpen === md.name && (
-                      <div className="absolute right-0 top-full z-50 mt-1 w-64 rounded border border-slate-600 bg-slate-800 shadow-lg">
-                        <button
-                          onClick={() => { void handleGenerateAuto(base, md.name); setRegenOpen(null) }}
-                          className="block w-full px-3 py-2 text-left hover:bg-slate-700"
-                        >
-                          <div className="text-xs font-medium text-slate-200">Generate CV</div>
-                          <div className="mt-0.5 text-xs text-slate-500">Run AI pipeline (configured provider → Gemini → original bullets)</div>
-                        </button>
-                        <button
-                          onClick={() => { void handleRerenderMd(md.name); setRegenOpen(null) }}
-                          className="block w-full border-t border-slate-700 px-3 py-2 text-left hover:bg-slate-700"
-                        >
-                          <div className="text-xs font-medium text-slate-200">Rerender MD→PDF</div>
-                          <div className="mt-0.5 text-xs text-slate-500">Convert the edited markdown to PDF — fast, no AI</div>
-                        </button>
-                      </div>
-                    )}
                   </div>
                 )}
                 <button
@@ -477,20 +542,11 @@ export function OutputPage() {
           <div className="flex h-full items-center justify-center text-sm text-slate-500">Loading…</div>
         )}
         {rightMode === 'md-view' && selectedMd && mdFileQ.data && (
-          <div className="flex h-full flex-col">
-            <div className="flex items-center justify-between border-b border-slate-700 px-4 py-2">
-              <span className="font-mono text-sm text-slate-400">{selectedMd}</span>
-              <button
-                onClick={() => handleEditMd({ name: selectedMd, path: selectedMd, size: 0 })}
-                className="rounded bg-indigo-600 px-3 py-1 text-sm text-white hover:bg-indigo-500"
-              >
-                Edit
-              </button>
-            </div>
-            <div className="flex-1 overflow-auto p-4">
-              <pre className="whitespace-pre-wrap font-mono text-xs text-slate-300">{mdFileQ.data.content}</pre>
-            </div>
-          </div>
+          <MdViewPanel
+            selectedMd={selectedMd}
+            content={mdFileQ.data.content}
+            onEdit={() => handleEditMd({ name: selectedMd, path: selectedMd, size: 0 })}
+          />
         )}
         {rightMode === 'editor' && selectedMd && mdFileQ.isLoading && (
           <div className="flex h-full items-center justify-center text-sm text-slate-500">Loading…</div>
@@ -499,16 +555,17 @@ export function OutputPage() {
           <div className="flex h-full overflow-hidden">
             {/* Editor pane */}
             <div className={`flex flex-col overflow-hidden ${showEditorSplit ? 'w-1/2 border-r border-slate-700' : 'w-full'}`}>
-              <FileEditor
-                path={selectedMd}
-                content={draft || mdFileQ.data.content}
-                onChange={v => { setDraft(v); setIsDirty(true); setSaved(false) }}
-                onSave={() => void handleSaveMd()}
-                onCancel={handleCancelEdit}
-                saving={saveMdMut.isPending}
-                saved={saved}
-                extraActions={
+              {(() => {
+                const editorContent = draft || mdFileQ.data.content
+                const extraActions = (
                   <>
+                    <button
+                      onClick={() => setSectionMode(m => !m)}
+                      className={`rounded px-2 py-1 text-xs hover:bg-slate-600 ${sectionMode ? 'bg-indigo-800 text-indigo-200' : 'bg-slate-700 text-slate-300'}`}
+                      title={sectionMode ? 'Switch to raw editor' : 'Switch to section editor'}
+                    >
+                      {sectionMode ? '§ Sections' : '§ Raw'}
+                    </button>
                     <button
                       onClick={() => void handleRegenPreview()}
                       disabled={builds[selectedMd]?.status === 'running'}
@@ -525,8 +582,31 @@ export function OutputPage() {
                       {showEditorSplit ? '⊟ PDF' : '⊞ PDF'}
                     </button>
                   </>
-                }
-              />
+                )
+                return sectionMode ? (
+                  <CvSectionEditor
+                    key={selectedMd}
+                    content={editorContent}
+                    onChange={handleEditorChange}
+                    onSave={() => void handleSaveMd()}
+                    onCancel={handleCancelEdit}
+                    saving={saveMdMut.isPending}
+                    saved={saved}
+                    extraActions={extraActions}
+                  />
+                ) : (
+                  <FileEditor
+                    path={selectedMd}
+                    content={editorContent}
+                    onChange={handleEditorChange}
+                    onSave={() => void handleSaveMd()}
+                    onCancel={handleCancelEdit}
+                    saving={saveMdMut.isPending}
+                    saved={saved}
+                    extraActions={extraActions}
+                  />
+                )
+              })()}
             </div>
             {/* PDF preview pane */}
             {showEditorSplit && (
@@ -623,6 +703,36 @@ export function OutputPage() {
           }}
           onCancel={() => setDiscardCancelDialog(false)}
         />
+      )}
+
+      {/* Regen dropdown — portal so it escapes the scrollable left panel */}
+      {regenDropdown && createPortal(
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setRegenDropdown(null)}
+          />
+          <div
+            className="fixed z-50 w-56 rounded border border-slate-600 bg-slate-800 shadow-xl"
+            style={{ top: regenDropdown.top, left: regenDropdown.left }}
+          >
+            <button
+              onClick={() => { void handleGenerateAuto(regenDropdown.pair.base, regenDropdown.md); setRegenDropdown(null) }}
+              className="block w-full px-3 py-2 text-left hover:bg-slate-700"
+            >
+              <div className="text-xs font-medium text-slate-200">Generate CV</div>
+              <div className="mt-0.5 text-xs text-slate-500">AI pipeline → Gemini → original bullets</div>
+            </button>
+            <button
+              onClick={() => { void handleRerenderMd(regenDropdown.md); setRegenDropdown(null) }}
+              className="block w-full border-t border-slate-700 px-3 py-2 text-left hover:bg-slate-700"
+            >
+              <div className="text-xs font-medium text-slate-200">Rerender MD → PDF</div>
+              <div className="mt-0.5 text-xs text-slate-500">Fast, no AI — converts edited markdown to PDF</div>
+            </button>
+          </div>
+        </>,
+        document.body,
       )}
     </div>
   )

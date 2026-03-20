@@ -11,7 +11,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Protocol
 
-from cv_compiler.schema.models import JobSpec, Profile, ProjectEntry
+from cv_compiler.schema.models import ExperienceEntry, JobSpec, Profile, ProjectEntry
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,6 +77,13 @@ class LLMProvider(Protocol):
         job: JobSpec | None,
     ) -> str: ...
 
+    def generate_cover_letter(
+        self,
+        profile: Profile,
+        experience: Sequence[ExperienceEntry],
+        job: JobSpec,
+    ) -> str: ...
+
 
 @dataclass(frozen=True, slots=True)
 class NoopProvider:
@@ -122,4 +129,13 @@ class NoopProvider:
         job: JobSpec | None,
     ) -> str:
         _ = (projects, job)
+        return ""
+
+    def generate_cover_letter(
+        self,
+        profile: Profile,
+        experience: Sequence[ExperienceEntry],
+        job: JobSpec,
+    ) -> str:
+        _ = (profile, experience, job)
         return ""

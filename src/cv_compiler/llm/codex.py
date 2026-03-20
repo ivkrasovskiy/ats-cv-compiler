@@ -31,7 +31,7 @@ from cv_compiler.llm.experience import (
 )
 from cv_compiler.llm.skills import build_skills_prompt, parse_skill_highlights
 from cv_compiler.llm.summary import build_experience_summary_prompt, parse_experience_summary
-from cv_compiler.schema.models import JobSpec, Profile, ProjectEntry
+from cv_compiler.schema.models import ExperienceEntry, JobSpec, Profile, ProjectEntry
 
 
 @dataclass(frozen=True, slots=True)
@@ -151,6 +151,15 @@ class CodexExecProvider(LLMProvider):
         output = self._run_codex(prompt)
         payload = _extract_json_payload(output)
         return parse_experience_summary(payload)
+
+    def generate_cover_letter(
+        self,
+        profile: Profile,
+        experience: Sequence[ExperienceEntry],
+        job: JobSpec,
+    ) -> str:
+        _ = (profile, experience, job)
+        return ""
 
     def _run_codex(self, prompt: str) -> str:
         exec_args = _ensure_full_auto(self._config.args)

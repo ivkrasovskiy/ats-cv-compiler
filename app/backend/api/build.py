@@ -17,11 +17,12 @@ router = APIRouter()
 class BuildRequest(BaseModel):
     job: str | None = None
     llm: str = "none"
+    cover_letter: bool = False
 
 
 @router.post("/build", status_code=202)
 def post_build(req: BuildRequest) -> dict:
-    job_id = start_build(req.job, req.llm)
+    job_id = start_build(req.job, req.llm, cover_letter=req.cover_letter)
     return {"job_id": job_id}
 
 

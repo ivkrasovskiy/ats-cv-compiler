@@ -4,11 +4,13 @@ export interface FileItem {
   path: string
   name: string
   size: number
+  company?: string
 }
 
 export interface BuildRequest {
   job: string | null
   llm: string
+  cover_letter?: boolean
 }
 
 export interface BuildJob {
@@ -161,6 +163,17 @@ export const uploadCvPdf = (file: File) => {
     json<{ saved: boolean; path: string }>(r),
   )
 }
+
+// ── form API (structured data file editing) ────────────────────────────────
+export const getDataFileForm = (path: string) =>
+  fetch(`${BASE}/files/data/${path}/form`).then(r => json<{ type: string; fields: Record<string, unknown> }>(r))
+
+export const putDataFileForm = (path: string, fields: Record<string, unknown>) =>
+  fetch(`${BASE}/files/data/${path}/form`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fields }),
+  }).then(r => json<{ path: string; saved: boolean }>(r))
 
 // ── ingest pdf ─────────────────────────────────────────────────────────────
 export const ingestPdf = () =>

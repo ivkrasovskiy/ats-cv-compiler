@@ -41,6 +41,7 @@ class BuildRequest:
     experience_regenerate: bool = False
     render_from_markdown: Path | None = None
     experience_summary: bool = False
+    cover_letter: bool = False
 
 
 _SKILL_TOKEN_RE = re.compile(r"[a-z0-9][a-z0-9+.#-]*")
@@ -278,12 +279,54 @@ def build_cv(request: BuildRequest) -> BuildResult:
         )
     )
     issues.extend(lint_rendered_output(render_result.output_path))
+
+    if request.cover_letter and job is not None and request.llm is not None:
+        cover_letter_path = request.out_dir / f"cover_letter_{_sanitize_stem(job.id)}.md"
+        if not cover_letter_path.exists():
+            try:
+                cover_letter_text = request.llm.generate_cover_letter(
+                    data.profile, data.experience, job
+                )
+                cover_letter_text = cover_letter_text.strip()
+                if cover_letter_text:
+                    cover_letter_path.parent.mkdir(parents=True, exist_ok=True)
+                    cover_letter_path.write_text(
+                        _format_cover_letter(cover_letter_text, job.id),
+                        encoding="utf-8",
+                    )
+            except Exception as exc:  # noqa: BLE001
+                issues.append(
+                    LintIssue(
+                        code="LLM_COVER_LETTER_FAILED",
+                        message=str(exc),
+                        severity=Severity.WARNING,
+                        source_path=cover_letter_path,
+                    )
+                )
+    elif request.cover_letter and job is None:
+        issues.append(
+            LintIssue(
+                code="LLM_COVER_LETTER_FAILED",
+                message="--cover-letter requires a job to be specified (use --job <path>)",
+                severity=Severity.WARNING,
+                source_path=None,
+            )
+        )
+
     return BuildResult(
         output_path=render_result.output_path,
         markdown_path=render_result.markdown_path,
         pdf_path=render_result.pdf_path,
         issues=tuple(issues),
     )
+
+
+def _format_cover_letter(text: str, job_id: str) -> str:
+    content = "---\n"
+    content += f"id: cover_letter_{job_id}\n"
+    content += "---\n\n"
+    content += text.strip() + "\n"
+    return content
 
 
 def _load_text_optional(path: Path | None) -> str | None:

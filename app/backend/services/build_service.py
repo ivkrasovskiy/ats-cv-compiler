@@ -15,16 +15,22 @@ _LLM_FAIL_MARKERS = frozenset(
         "LLM_SKILL_HIGHLIGHT_FAILED",
         "LLM_SKILL_SELECT_FAILED",
         "LLM_SUMMARY_FAILED",
+        "LLM_COVER_LETTER_FAILED",
     ]
 )
 
 
-def start_build(job_path: str | None, llm: str) -> str:
+def start_build(job_path: str | None, llm: str, *, cover_letter: bool = False) -> str:
     job_id = str(uuid.uuid4())
     with _lock:
         _jobs[job_id] = {"status": "running", "lines": [], "exit_code": None}
 
-    thread = threading.Thread(target=_run_build, args=(job_id, job_path, llm), daemon=True)
+    thread = threading.Thread(
+        target=_run_build,
+        args=(job_id, job_path, llm),
+        kwargs={"cover_letter": cover_letter},
+        daemon=True,
+    )
     thread.start()
     return job_id
 
@@ -132,25 +138,27 @@ def _run_build_from_md(job_id: str, md_path: str) -> None:
     _finish(job_id, exit_code)
 
 
-def _run_build(job_id: str, job_path: str | None, llm: str) -> None:
+def _run_build(job_id: str, job_path: str | None, llm: str, *, cover_letter: bool = False) -> None:
     if llm == "auto":
-        _run_build_auto(job_id, job_path)
+        _run_build_auto(job_id, job_path, cover_letter=cover_letter)
         return
 
     root = get_project_root()
     cmd = ["uv", "run", "cv", "build", "--job", job_path or "false"]
     if llm and llm != "none":
         cmd += ["--llm", llm]
+    if cover_letter:
+        cmd += ["--cover-letter"]
     _, exit_code = _run_subprocess_streaming(job_id, root, cmd)
     _finish(job_id, exit_code)
 
 
-def _run_build_auto(job_id: str, job_path: str | None) -> None:
+def _run_build_auto(job_id: str, job_path: str | None, *, cover_letter: bool = False) -> None:
     """Try each AI provider in order, falling back gracefully to the deterministic pipeline."""
     root = get_project_root()
     chain = _provider_chain(root)
     ai_providers = chain[:-1]  # all except the no-AI fallback
-    total_steps = len(chain)   # AI providers + 1 deterministic fallback
+    total_steps = len(chain)  # AI providers + 1 deterministic fallback
 
     for step, (display_name, codex_cmd) in enumerate(ai_providers, start=1):
         # [STEP M/N] lines are parsed by the frontend as progress markers (not shown in log)
@@ -160,6 +168,8 @@ def _run_build_auto(job_id: str, job_path: str | None) -> None:
             env["CV_CODEX_CMD"] = codex_cmd
             env["CV_CODEX_ARGS"] = "-p"
         cmd = ["uv", "run", "cv", "build", "--job", job_path or "false", "--llm", "agents"]
+        if cover_letter:
+            cmd += ["--cover-letter"]
         lines, exit_code = _run_subprocess_streaming(job_id, root, cmd, env)
 
         if exit_code != 0:
@@ -180,5 +190,7 @@ def _run_build_auto(job_id: str, job_path: str | None) -> None:
     _append_line(job_id, f"[STEP {total_steps}/{total_steps}] Deterministic pipeline")
     _append_line(job_id, "[→] All AI providers unavailable — using your original bullets.")
     cmd = ["uv", "run", "cv", "build", "--job", job_path or "false"]
+    if cover_letter:
+        _append_line(job_id, "[→] Cover letter skipped — no LLM available in deterministic mode.")
     _, exit_code = _run_subprocess_streaming(job_id, root, cmd)
     _finish(job_id, exit_code)

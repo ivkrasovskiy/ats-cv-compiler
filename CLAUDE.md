@@ -119,6 +119,21 @@ GEMINI.md           ← project guide for Gemini CLI users
 
 ---
 
+## Claude Code skills & commands
+
+A library of reusable Claude Code skills and slash commands lives at:
+
+```
+../everything-claude-code/
+  commands/   ← slash commands (e.g. /plan, /tdd, /code-review, /refactor-clean)
+  agents/     ← agent definitions
+  hooks/      ← hook scripts
+```
+
+Use these when the task matches — e.g. `/code-review` before a PR, `/tdd` for test-first work, `/plan` for large features.
+
+---
+
 ## Common problems and fixes
 
 | Symptom | Fix |

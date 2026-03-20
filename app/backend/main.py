@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.backend.api import build, config, doctor, files, health, lint
+from app.backend.api import build, config, doctor, files, form, health, lint
 
 
 def create_app() -> FastAPI:
@@ -19,6 +19,7 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(health.router, prefix="/api")
+    app.include_router(form.router, prefix="/api")  # must be before files (more specific routes)
     app.include_router(files.router, prefix="/api")
     app.include_router(build.router, prefix="/api")
     app.include_router(lint.router, prefix="/api")

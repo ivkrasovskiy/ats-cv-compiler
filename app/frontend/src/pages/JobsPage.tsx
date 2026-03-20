@@ -24,6 +24,7 @@ export function JobsPage() {
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   const [previewJob, setPreviewJob] = useState<string | null>(null)
   const [expandedJob, setExpandedJob] = useState<string | null>(null)
+  const [coverLetterJobs, setCoverLetterJobs] = useState<Set<string>>(new Set())
 
   const listQ = useQuery({ queryKey: ['files', 'jobs'], queryFn: listJobFiles })
   const outQ = useQuery({ queryKey: ['out'], queryFn: listOutFiles })
@@ -76,7 +77,11 @@ export function JobsPage() {
 
   const handleGenerate = async (jobName: string) => {
     try {
-      const { job_id } = await startBuild({ job: `jobs/${jobName}`, llm: 'auto' })
+      const { job_id } = await startBuild({
+        job: `jobs/${jobName}`,
+        llm: 'auto',
+        cover_letter: coverLetterJobs.has(jobName),
+      })
       await run(jobName, job_id)
       void qc.invalidateQueries({ queryKey: ['out'] })
     } catch { /* ignore */ }
@@ -256,6 +261,22 @@ export function JobsPage() {
                     >
                       Edit
                     </button>
+                    <label className="flex items-center gap-1 cursor-pointer text-xs text-slate-400">
+                      <input
+                        type="checkbox"
+                        checked={coverLetterJobs.has(f.name)}
+                        onChange={e => {
+                          setCoverLetterJobs(prev => {
+                            const next = new Set(prev)
+                            if (e.target.checked) next.add(f.name)
+                            else next.delete(f.name)
+                            return next
+                          })
+                        }}
+                        className="rounded"
+                      />
+                      Cover letter
+                    </label>
                     <Tooltip text="Runs AI pipeline with configured provider, falls back to Gemini then deterministic">
                       <button
                         onClick={() => void handleGenerate(f.name)}

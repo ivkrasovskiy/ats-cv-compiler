@@ -16,6 +16,11 @@ from cv_compiler.llm.base import (
     ExperienceDraft,
     LLMProvider,
 )
+from cv_compiler.llm.cover_letter import (
+    build_cover_letter_prompt,
+    cover_letter_schema,
+    parse_cover_letter,
+)
 from cv_compiler.llm.experience import (
     build_experience_prompt,
     load_experience_templates,
@@ -40,7 +45,7 @@ from cv_compiler.llm.summary import (
     experience_summary_schema,
     parse_experience_summary,
 )
-from cv_compiler.schema.models import JobSpec, Profile, ProjectEntry
+from cv_compiler.schema.models import ExperienceEntry, JobSpec, Profile, ProjectEntry
 
 
 class ManualProvider(LLMProvider):
@@ -201,6 +206,38 @@ class ManualProvider(LLMProvider):
         raw = summary_response_path.read_text(encoding="utf-8")
         content = _extract_response_content(raw)
         return parse_experience_summary(content)
+
+    def generate_cover_letter(
+        self,
+        profile: Profile,
+        experience: Sequence[ExperienceEntry],
+        job: JobSpec,
+    ) -> str:
+        prompt = build_cover_letter_prompt(
+            Path("prompts/cover_letter_prompt.md"),
+            profile=profile,
+            experience=tuple(experience),
+            job=job,
+        )
+        payload = build_chat_payload(self._model, prompt, cover_letter_schema())
+        request_bundle = {"payload": payload}
+        if self._base_url:
+            request_bundle["endpoint"] = build_chat_endpoint(self._base_url)
+        cover_letter_request_path = self._request_path.with_name("llm_cover_letter_request.json")
+        cover_letter_response_path = self._response_path.with_name("llm_cover_letter_response.json")
+        cover_letter_request_path.parent.mkdir(parents=True, exist_ok=True)
+        cover_letter_request_path.write_text(
+            json.dumps(request_bundle, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        if not cover_letter_response_path.exists():
+            raise ValueError(
+                "Manual LLM mode: cover letter response file missing. "
+                f"Paste model output into {cover_letter_response_path} and retry."
+            )
+        raw = cover_letter_response_path.read_text(encoding="utf-8")
+        content = _extract_response_content(raw)
+        return parse_cover_letter(content)
 
 
 def _extract_response_content(raw: str) -> str:

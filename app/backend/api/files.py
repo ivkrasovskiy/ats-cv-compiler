@@ -1,4 +1,5 @@
 import shutil
+from pathlib import Path
 from typing import Annotated
 
 import yaml
@@ -13,6 +14,7 @@ from app.backend.services.file_service import (
     safe_resolve,
     write_file,
 )
+from cv_compiler.parse.frontmatter import parse_markdown_frontmatter
 
 router = APIRouter()
 
@@ -20,9 +22,30 @@ router = APIRouter()
 # ── data/ ────────────────────────────────────────────────────────────────────
 
 
+def _read_company(file_path: Path) -> str | None:
+    """Read company field from YAML frontmatter."""
+    try:
+        doc = parse_markdown_frontmatter(file_path)
+        return str(doc.frontmatter.get("company") or "").strip() or None
+    except Exception:
+        return None
+
+
 @router.get("/files/data")
 def list_data_files() -> list[dict]:
-    return file_tree(get_project_root() / "data")
+    root = get_project_root()
+    files = file_tree(root / "data")
+    for f in files:
+        path = f["path"]
+        if path.startswith(("experience/", "projects/")) and path.endswith(".md"):
+            try:
+                file_path = safe_resolve(root / "data", path)
+                company = _read_company(file_path)
+                if company:
+                    f["company"] = company
+            except Exception:
+                pass
+    return files
 
 
 @router.get("/files/data/{path:path}")
