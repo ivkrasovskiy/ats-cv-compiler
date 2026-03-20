@@ -55,6 +55,12 @@ _pause() {
 # The AI assistant is installed via npm, so this must come first.
 if command -v npm > /dev/null 2>&1; then
     ok "npm found ($(node --version))"
+    # ── Node.js version check (Vite requires ≥ 18) ────────────────────────────
+    NODE_MAJOR=$(node -e 'process.stdout.write(process.version.replace(/^v/,"").split(".")[0])')
+    if [ "$NODE_MAJOR" -lt 18 ]; then
+        fail "Node.js 18+ required (found $(node --version))" \
+             "brew upgrade node   or   https://nodejs.org/"
+    fi
 else
     if ! command -v brew > /dev/null 2>&1; then
         printf '[…] Installing Homebrew (you may be prompted for your password)...\n'
@@ -176,22 +182,7 @@ esac
 # Every fail() call will print "Still stuck? Open a new terminal and run: $ $ASSISTANT"
 # ─────────────────────────────────────────────────────────────────────────────
 
-# ── Step 4 — Check Python 3.11+ ──────────────────────────────────────────────
-if command -v python3 > /dev/null 2>&1; then
-    PY_MAJOR=$(python3 -c 'import sys; print(sys.version_info.major)')
-    PY_MINOR=$(python3 -c 'import sys; print(sys.version_info.minor)')
-    if [ "$PY_MAJOR" -ge 3 ] && [ "$PY_MINOR" -ge 11 ]; then
-        ok "Python ${PY_MAJOR}.${PY_MINOR}"
-    else
-        fail "Python 3.11+ required (found ${PY_MAJOR}.${PY_MINOR})" \
-             "brew install python@3.12   or   https://www.python.org/downloads/"
-    fi
-else
-    fail "Python 3 not found" \
-         "brew install python@3.12   or   https://www.python.org/downloads/"
-fi
-
-# ── Step 5 — Install uv ──────────────────────────────────────────────────────
+# ── Step 4 — Install uv ──────────────────────────────────────────────────────
 if command -v uv > /dev/null 2>&1; then
     ok "uv found ($(uv --version))"
 else
@@ -206,11 +197,28 @@ else
     fi
 fi
 
+# ── Step 5 — Check Python 3.11+ (uv can install if missing/old) ──────────────
+if command -v python3 > /dev/null 2>&1; then
+    PY_MAJOR=$(python3 -c 'import sys; print(sys.version_info.major)')
+    PY_MINOR=$(python3 -c 'import sys; print(sys.version_info.minor)')
+    if [ "$PY_MAJOR" -ge 3 ] && [ "$PY_MINOR" -ge 11 ]; then
+        ok "Python ${PY_MAJOR}.${PY_MINOR}"
+    else
+        printf '[…] Python %s.%s found (need 3.11+). Installing Python 3.12 via uv...\n' "$PY_MAJOR" "$PY_MINOR"
+        uv python install 3.12
+        ok "Python 3.12 installed by uv"
+    fi
+else
+    printf '[…] Python 3 not found. Installing Python 3.12 via uv...\n'
+    uv python install 3.12
+    ok "Python 3.12 installed by uv"
+fi
+
 # ── Step 6 — Install Python dependencies (soft failure) ──────────────────────
 # Non-fatal: the AI assistant is already installed and can help debug any issue.
 printf '[…] Installing Python dependencies...\n'
 UV_SYNC_OK=1
-if ! uv sync; then
+if ! uv sync --extra app; then
     UV_SYNC_OK=0
     printf '\n[!] Python dependency installation failed (see error above).\n'
     printf '    The  uv run cv  commands will not work until this is fixed.\n'
@@ -220,17 +228,29 @@ else
     ok "Python dependencies installed"
 fi
 
-# ── Step 7 — Quick orientation tour (non-skippable, Enter-gated) ─────────────
-if [ "$UV_SYNC_OK" = "1" ]; then
+# ── Step 7 — Install frontend npm dependencies ────────────────────────────────
+printf '[…] Installing frontend dependencies...\n'
+FRONTEND_OK=1
+if ! npm install --prefix app/frontend; then
+    FRONTEND_OK=0
+    printf '\n[!] Frontend dependency installation failed (see error above).\n'
+    printf '    The web app will not work until this is fixed.\n'
+    printf '    Re-run  bash onboard.sh  once you have resolved it.\n\n'
+else
+    ok "Frontend dependencies installed"
+fi
+
+# ── Step 8 — Quick orientation tour (non-skippable, Enter-gated) ─────────────
+if [ "$UV_SYNC_OK" = "1" ] && [ "$FRONTEND_OK" = "1" ]; then
     printf '\n[✓] Setup complete! Before we open %s, here is a 1-minute overview.\n\n' "$ASSISTANT"
 else
-    printf '\n[!] Setup partially complete (uv sync failed — see above).\n'
+    printf '\n[!] Setup partially complete (see errors above).\n'
     printf '    Opening %s so you can ask it to help fix the remaining issue.\n\n' "$ASSISTANT"
 fi
 
 # ── Screen 1: core workflow ───────────────────────────────────────────────────
 printf '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'
-printf ' 1 of 5  —  HOW IT WORKS\n'
+printf ' 1 of 6  —  HOW IT WORKS\n'
 printf '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'
 printf '\n'
 printf '  Your career data lives in the  data/  folder:\n'
@@ -254,7 +274,7 @@ _pause
 
 # ── Screen 2: job targeting ───────────────────────────────────────────────────
 printf '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'
-printf ' 2 of 5  —  APPLYING TO A SPECIFIC JOB\n'
+printf ' 2 of 6  —  APPLYING TO A SPECIFIC JOB\n'
 printf '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'
 printf '\n'
 printf '  For each job you want to apply to:\n'
@@ -282,7 +302,7 @@ _pause
 
 # ── Screen 3: manual edits via markdown ──────────────────────────────────────
 printf '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'
-printf ' 3 of 5  —  MAKING MANUAL TWEAKS\n'
+printf ' 3 of 6  —  MAKING MANUAL TWEAKS\n'
 printf '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'
 printf '\n'
 printf '  Every build produces a Markdown file alongside the PDF:\n'
@@ -303,7 +323,7 @@ _pause
 
 # ── Screen 4: customisation ───────────────────────────────────────────────────
 printf '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'
-printf ' 4 of 5  —  EVERYTHING IS CUSTOMISABLE\n'
+printf ' 4 of 6  —  EVERYTHING IS CUSTOMISABLE\n'
 printf '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'
 printf '\n'
 printf '  Nothing is hardcoded. Every part of the output is driven by\n'
@@ -318,9 +338,28 @@ printf '  It is all just files — no code changes required for most tweaks.\n'
 printf '\n'
 _pause
 
-# ── Screen 5: how to change things ───────────────────────────────────────────
+# ── Screen 5: web app ────────────────────────────────────────────────────────
 printf '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'
-printf ' 5 of 5  —  HOW TO MAKE CHANGES\n'
+printf ' 5 of 6  —  LAUNCHING THE WEB APP\n'
+printf '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'
+printf '\n'
+printf '  You can use the web interface to edit your data without touching\n'
+printf '  any files by hand, run builds, and preview the PDF — all in your\n'
+printf '  browser:\n'
+printf '\n'
+printf '    bash start.sh          ← recommended\n'
+printf '    make dev               ← same thing, for developers\n'
+printf '\n'
+printf '  Then open:  http://localhost:5173\n'
+printf '\n'
+printf '  The web app runs entirely locally — no data leaves your machine.\n'
+printf '  Press Ctrl-C in the terminal to stop it.\n'
+printf '\n'
+_pause
+
+# ── Screen 6: how to change things ───────────────────────────────────────────
+printf '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'
+printf ' 6 of 6  —  HOW TO MAKE CHANGES\n'
 printf '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'
 printf '\n'
 printf '  Your AI assistant knows this entire codebase. If you want to\n'
@@ -358,6 +397,13 @@ if [ "${CV_ONBOARD_TEST:-}" = "1" ]; then
     printf '[TEST MODE] Would exec %s. Skipping.\n' "$ASSISTANT"
     exit 0
 fi
+
+printf 'Launch the web app now? [Y/n]: '
+read -r _LAUNCH
+case "$_LAUNCH" in
+    [Nn]*) ;;
+    *) exec sh start.sh ;;
+esac
 
 printf 'Press Enter to open %s...' "$ASSISTANT"
 read -r _ENTER

@@ -62,6 +62,41 @@ hr "TEST 6: $ASSISTANT binary on PATH"
 command -v "$ASSISTANT" > /dev/null 2>&1 || true
 check "$ASSISTANT found on PATH" "0" "$?"
 
+# ── Test 7: fastapi importable (confirms --extra app worked) ──────────────────
+hr "TEST 7: fastapi importable"
+uv run python -c "import fastapi" > /dev/null 2>&1
+check "fastapi importable" "0" "$?"
+
+# ── Test 8: frontend node_modules present ─────────────────────────────────────
+hr "TEST 8: app/frontend/node_modules exists"
+[ -d app/frontend/node_modules ] && T8_EXIT=0 || T8_EXIT=1
+check "app/frontend/node_modules exists" "0" "$T8_EXIT"
+
+# ── Test 9: cv-app starts and /api/health responds 200 ────────────────────────
+hr "TEST 9: cv-app /api/health responds 200"
+uv run --extra app cv-app &
+APP_PID=$!
+i=0
+while [ $i -lt 10 ]; do
+    curl -sf http://localhost:8000/api/health > /dev/null 2>&1 && break
+    sleep 1
+    i=$((i + 1))
+done
+HTTP=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/api/health 2>/dev/null || echo 000)
+kill $APP_PID 2>/dev/null; wait $APP_PID 2>/dev/null
+check "cv-app /api/health returns 200" "200" "$HTTP"
+
+# ── Test 10: start.sh detects busy port ───────────────────────────────────────
+hr "TEST 10: start.sh detects port 8000 busy"
+# Bind port 8000 so start.sh should detect and exit 1
+nc -l 8000 &
+NC_PID=$!
+sleep 1
+T10_OUT=$(sh start.sh 2>&1 || true)
+kill $NC_PID 2>/dev/null; wait $NC_PID 2>/dev/null
+echo "$T10_OUT" | grep -q "8000" && T10_EXIT=0 || T10_EXIT=1
+check "start.sh detects port 8000 busy" "0" "$T10_EXIT"
+
 # ── Summary ───────────────────────────────────────────────────────────────────
 hr "RESULTS"
 printf 'Assistant: %s  Passed: %s  Failed: %s\n' "$ASSISTANT" "$PASS" "$FAIL"
