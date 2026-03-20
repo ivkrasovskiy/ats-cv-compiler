@@ -1,3 +1,4 @@
+import logging
 import shutil
 from pathlib import Path
 from typing import Annotated
@@ -16,6 +17,7 @@ from app.backend.services.file_service import (
 )
 from cv_compiler.parse.frontmatter import parse_markdown_frontmatter
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -269,6 +271,7 @@ def run_ingest_pdf() -> dict:
             overwrite=True,
         )
     except Exception as exc:
+        logger.exception("PDF ingest failed")
         raise HTTPException(500, str(exc)) from exc
 
     return {

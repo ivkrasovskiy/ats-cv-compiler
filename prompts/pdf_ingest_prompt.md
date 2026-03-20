@@ -34,5 +34,38 @@ Work mode (Remote, Hybrid, On-site) and city belong in the `location` field when
 ## Tags
 Infer `tags` from technologies, languages, and tools mentioned in each role/project. Leave empty if none are mentioned.
 
+## Skills — always populate this list
+Extract skills from any "Skills", "Technical Skills", "Technologies", "Stack", or similar section.
+Group them into named categories (e.g. "ML / AI", "Languages", "Tools & Infrastructure").
+If the CV lists skills without explicit categories, infer sensible groupings from the skill list.
+Each category must have a `name` (string) and `items` (non-empty list of strings).
+The `skills` array must never be empty if the CV mentions any tools, languages, or technologies.
+
+## Education
+Extract every education entry: universities, degrees, diplomas, bootcamps, certifications, and language proficiency.
+
+**Also look in a "Languages" section** (or similar): for each language with a stated level (e.g. "English — C1", "Spanish — B2", "Russian — Native"), create one education entry:
+- `institution` = the language name (e.g. "English", "Spanish", "Russian")
+- `degree` = the level or certification (e.g. "C1 / Advanced", "Native", "IELTS 7.5")
+- `location` = empty string
+- `start_date` / `end_date` = empty strings
+
+For formal education entries provide:
+- `institution` — university or school name
+- `degree` — the degree (e.g. "BSc Applied Math and Physics", "MSc Computer Science")
+- `location` — city/country if stated; otherwise empty string
+- `start_date` / `end_date` — use "YYYY-MM" if the month is known, or just "YYYY" if only the year is available; use empty string if unknown
+
+## Dates
+Use "YYYY-MM" when the month is known (e.g. "2020-03"), or "YYYY" when only the year is available (e.g. "2020"). Use empty string if the date is completely unknown. For ongoing/current roles use empty string for end_date.
+
+## Links
+For profile links such as LinkedIn, GitHub, Telegram, and personal websites:
+- Set `label` to the service name (e.g. "LinkedIn", "GitHub", "Telegram")
+- Set `url` to the full URL if it appears as visible text (e.g. "linkedin.com/in/foo" → "https://linkedin.com/in/foo")
+- If a section at the end of the prompt lists hyperlinks found in PDF annotations, match each URL to the
+  correct label by domain: linkedin.com → LinkedIn, github.com → GitHub, t.me → Telegram, etc.
+- If no URL can be determined, set `url` to an empty string
+
 PDF_TEXT:
 {{PDF_TEXT}}

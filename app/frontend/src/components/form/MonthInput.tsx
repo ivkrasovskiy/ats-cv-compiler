@@ -5,16 +5,16 @@ interface MonthInputProps {
   disabled?: boolean
 }
 
-export function MonthInput({ value, onChange, placeholder, disabled }: MonthInputProps) {
+export function MonthInput({ value, onChange, placeholder = 'e.g. 2022 or 2022-03', disabled }: MonthInputProps) {
   return (
-    <div className="flex gap-2">
+    <div className="flex gap-2 items-center">
       <input
-        type="month"
+        type="text"
         value={value}
         onChange={e => onChange(e.target.value)}
         disabled={disabled}
         placeholder={placeholder}
-        className="rounded-lg border border-slate-600 bg-slate-800 px-3 py-1.5 text-sm text-slate-200 outline-none focus:border-indigo-500 disabled:opacity-50"
+        className="w-36 rounded-lg border border-slate-600 bg-slate-800 px-3 py-1.5 text-sm text-slate-200 outline-none focus:border-indigo-500 disabled:opacity-50"
       />
       {value && (
         <button

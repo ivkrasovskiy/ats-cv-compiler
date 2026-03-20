@@ -1,5 +1,23 @@
 # ats-cv-compiler
 
+## Web app
+
+| Dashboard | Profile editor | Target jobs |
+|-----------|---------------|-------------|
+| ![Dashboard](docs/screenshots/dashboard.png) | ![Profile](docs/screenshots/profile.png) | ![Jobs](docs/screenshots/jobs.png) |
+
+| Generated CVs | Gen Config |
+|--------------|-----------|
+| ![Output](docs/screenshots/output.png) | ![Config](docs/screenshots/config.png) |
+
+**Dashboard** — upload your CV PDF, parse it with AI, build generic or job-targeted CVs.
+**Profile** — review and edit all extracted data: profile, skills, education, projects.
+**Target Jobs** — paste job descriptions to get a tailored CV for each role.
+**Generated CVs** — preview and download your built PDFs.
+**Gen Config** — configure the AI provider (Gemini, Claude, or custom endpoint).
+
+---
+
 ## Getting started
 
 **Prerequisites:** Git and internet. Everything else is installed automatically.

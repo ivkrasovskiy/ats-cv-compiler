@@ -116,6 +116,35 @@ def extract_pdf_text(path: Path) -> str:
     return combined
 
 
+def extract_pdf_hyperlinks(path: Path) -> list[str]:
+    """Extract all URI hyperlinks from PDF link annotations."""
+    try:
+        from pypdf import PdfReader
+    except ImportError:  # pragma: no cover
+        return []
+    reader = PdfReader(str(path))
+    urls: list[str] = []
+    seen: set[str] = set()
+    for page in reader.pages:
+        if "/Annots" not in page:
+            continue
+        for annot_ref in page["/Annots"]:
+            try:
+                annot = annot_ref.get_object()
+            except Exception:
+                continue
+            if annot.get("/Subtype") != "/Link":
+                continue
+            action = annot.get("/A")
+            if action is None:
+                continue
+            uri = action.get("/URI")
+            if uri and isinstance(uri, str) and uri not in seen:
+                seen.add(uri)
+                urls.append(uri)
+    return urls
+
+
 def ingest_pdf_to_markdown(
     *,
     data_dir: Path,
@@ -132,7 +161,8 @@ def ingest_pdf_to_markdown(
 ) -> IngestResult:
     """Convert a PDF CV into canonical Markdown files under `data_dir`."""
     text = extract_pdf_text(pdf_path)
-    prompt = _build_ingest_prompt(prompt_path, text)
+    hyperlinks = extract_pdf_hyperlinks(pdf_path)
+    prompt = _build_ingest_prompt(prompt_path, text, hyperlinks)
 
     payload = build_chat_payload(manual_model, prompt, _ingest_schema())
     if llm_mode == "api":
@@ -219,7 +249,7 @@ def write_ingest_files(data_dir: Path, parsed: ParsedCv, *, overwrite: bool) -> 
             "links": [
                 {
                     "label": _require_field(link.label, "profile.links.label", warnings),
-                    "url": link.url,
+                    "url": link.url or "",
                 }
                 for link in parsed.profile.links
                 if link.label or link.url
@@ -316,9 +346,14 @@ def write_ingest_files(data_dir: Path, parsed: ParsedCv, *, overwrite: bool) -> 
     return IngestResult(written_paths=tuple(written), warnings=tuple(warnings))
 
 
-def _build_ingest_prompt(path: Path, pdf_text: str) -> str:
+def _build_ingest_prompt(path: Path, pdf_text: str, hyperlinks: list[str] | None = None) -> str:
     prompt = path.read_text(encoding="utf-8")
-    return prompt.replace("{{PDF_TEXT}}", pdf_text.strip())
+    text = pdf_text.strip()
+    if hyperlinks:
+        links_block = "\n\n[HYPERLINKS FOUND IN PDF ANNOTATIONS]\n"
+        links_block += "\n".join(f"- {url}" for url in hyperlinks)
+        text = text + links_block
+    return prompt.replace("{{PDF_TEXT}}", text)
 
 
 def _request_llm_content(config: LLMConfig, prompt: str) -> str:
@@ -424,8 +459,8 @@ def _parse_experience(value: object) -> tuple[ParsedExperience, ...]:
                 company=_coerce_str(item.get("company")),
                 title=_coerce_str(item.get("title")),
                 location=_coerce_str(item.get("location")),
-                start_date=_coerce_str(item.get("start_date")),
-                end_date=_coerce_str(item.get("end_date")),
+                start_date=_normalize_date(_coerce_str(item.get("start_date"))),
+                end_date=_normalize_date(_coerce_str(item.get("end_date")), is_end=True),
                 bullets=_coerce_str_list(item.get("bullets")),
                 tags=_coerce_str_list(item.get("tags")),
             )
@@ -445,8 +480,8 @@ def _parse_projects(value: object) -> tuple[ParsedProject, ...]:
                 name=_coerce_str(item.get("name")),
                 company=_coerce_str(item.get("company")),
                 role=_coerce_str(item.get("role")),
-                start_date=_coerce_str(item.get("start_date")),
-                end_date=_coerce_str(item.get("end_date")),
+                start_date=_normalize_date(_coerce_str(item.get("start_date"))),
+                end_date=_normalize_date(_coerce_str(item.get("end_date")), is_end=True),
                 bullets=_coerce_str_list(item.get("bullets")),
                 tags=_coerce_str_list(item.get("tags")),
             )
@@ -482,8 +517,8 @@ def _parse_education(value: object) -> tuple[ParsedEducation, ...]:
                 institution=_coerce_str(item.get("institution")),
                 degree=_coerce_str(item.get("degree")),
                 location=_coerce_str(item.get("location")),
-                start_date=_coerce_str(item.get("start_date")),
-                end_date=_coerce_str(item.get("end_date")),
+                start_date=_normalize_date(_coerce_str(item.get("start_date"))),
+                end_date=_normalize_date(_coerce_str(item.get("end_date")), is_end=True),
             )
         )
     return tuple(items)
@@ -494,6 +529,12 @@ def _coerce_str(value: object) -> str | None:
         text = value.strip()
         return text if text else None
     return None
+
+
+def _normalize_date(value: str | None, *, is_end: bool = False) -> str | None:
+    """Keep dates as-is; year-only values (YYYY) are valid and preserved."""
+    _ = is_end  # reserved for future use
+    return value
 
 
 def _coerce_str_list(value: object) -> tuple[str, ...]:
@@ -546,8 +587,8 @@ def _backup_ingest_files(data_dir: Path, *, overwrite: bool) -> Path | None:
         return None
     backup_root = data_dir.parent / "tmp"
     backup_root.mkdir(parents=True, exist_ok=True)
-    backup_dir = backup_root / f"ingest_backup_{int(time.time())}"
-    backup_dir.mkdir(parents=True, exist_ok=False)
+    backup_dir = backup_root / f"ingest_backup_{int(time.time() * 1000)}"
+    backup_dir.mkdir(parents=True, exist_ok=True)
     for path in candidates:
         rel = path.relative_to(data_dir)
         dest = backup_dir / rel

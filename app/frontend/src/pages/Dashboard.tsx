@@ -244,20 +244,30 @@ export function Dashboard() {
                   <p className="text-xs text-slate-400 animate-pulse">⏳ Parsing your CV…</p>
                 )}
                 {parseState === 'done' && (
-                  <div>
-                    <p className="text-xs text-green-400">
-                      ✓ {parseCount} files created{' '}
-                      <button onClick={() => navigate('/data')} className="underline">
-                        Go to Profile to review →
-                      </button>
-                    </p>
+                  <div className="mt-2 space-y-2">
+                    <p className="text-xs text-green-400">✓ {parseCount} files created</p>
                     {parseWarnings.length > 0 && (
-                      <ul className="mt-1 space-y-0.5">
+                      <ul className="mb-1 space-y-0.5">
                         {parseWarnings.map((w, i) => (
                           <li key={i} className="text-xs text-yellow-400">⚠ {w}</li>
                         ))}
                       </ul>
                     )}
+                    <p className="text-xs font-medium text-slate-300">Review each section before building:</p>
+                    <ol className="space-y-1">
+                      {[
+                        { to: '/data?tab=profile', label: 'Profile — name, headline, links' },
+                        { to: '/data?tab=skills', label: 'Skills — categories & items' },
+                        { to: '/data?tab=education', label: 'Education & languages' },
+                        { to: '/data?tab=projects', label: 'Projects — dates, bullets, tags' },
+                      ].map(({ to, label }, i) => (
+                        <li key={i} className="flex items-center gap-2 text-xs text-slate-400">
+                          <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-indigo-800 text-[10px] font-bold text-white">{i + 1}</span>
+                          <button onClick={() => navigate(to)} className="underline text-indigo-400 hover:text-indigo-300 text-left">{label}</button>
+                        </li>
+                      ))}
+                    </ol>
+                    <p className="text-xs text-slate-500">Then come back here to build your CV ↓</p>
                   </div>
                 )}
                 {parseState === 'error' && (
