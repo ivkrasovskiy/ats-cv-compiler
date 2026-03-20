@@ -1,87 +1,72 @@
 #!/usr/bin/env node
 /**
  * scripts/take_screenshots.mjs
- * Takes screenshots of all 5 app pages using example data.
+ * Screenshots all 5 app pages using example (Jordan Blake) data only.
+ * Personal data is never read.
  *
- * Usage (frontend dev server must already be running on :5173):
- *   node scripts/take_screenshots.mjs
- *
- * Or via the wrapper that handles everything:
- *   bash scripts/run_screenshots.sh
+ * Usage: bash scripts/run_screenshots.sh
+ * (Frontend dev server must be running on :5173)
  */
 
 import { chromium } from '../app/e2e/node_modules/playwright/index.mjs'
 import { spawn, execSync } from 'child_process'
-import { mkdirSync, cpSync, mkdtempSync, rmSync, existsSync } from 'fs'
+import { mkdirSync, cpSync, mkdtempSync, rmSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 
-const FRONTEND_URL = 'http://localhost:5173'
-const BACKEND_PORT = 8000
-const OUT_DIR = 'docs/screenshots'
+const FRONTEND = 'http://localhost:5173'
+const BACKEND  = 'http://localhost:8000'
+const OUT_DIR  = 'docs/screenshots'
 
-async function wait(ms) {
-  return new Promise(r => setTimeout(r, ms))
-}
+const wait = ms => new Promise(r => setTimeout(r, ms))
 
 async function waitForBackend(maxMs = 20_000) {
   const deadline = Date.now() + maxMs
   while (Date.now() < deadline) {
-    try {
-      const res = await fetch(`http://localhost:${BACKEND_PORT}/api/health`)
-      if (res.ok) return
-    } catch { /* not up yet */ }
-    await wait(500)
+    try { if ((await fetch(`${BACKEND}/api/health`)).ok) return } catch {}
+    await wait(400)
   }
-  throw new Error(`Backend did not start within ${maxMs}ms`)
-}
-
-async function clickFile(page, text) {
-  // FileTree renders plain <button> elements with the file path as text
-  const btn = page.locator(`button:has-text("${text}")`).first()
-  if (await btn.isVisible().catch(() => false)) {
-    await btn.click()
-    await wait(800)
-    return true
-  }
-  return false
+  throw new Error('Backend did not come up in time')
 }
 
 async function main() {
-  // ── 1. Set up temp project root with example data ─────────────────────────
-  const tmpRoot = mkdtempSync(join(tmpdir(), 'ats-demo-'))
-  console.log(`[i] Temp root: ${tmpRoot}`)
+  // ── 1. Build clean example project in a temp dir ──────────────────────────
+  const root = mkdtempSync(join(tmpdir(), 'ats-demo-'))
+  console.log(`[i] Temp root: ${root}`)
 
   try {
-    cpSync('examples/basic/data', join(tmpRoot, 'data'), { recursive: true })
-    if (existsSync('examples/basic/jobs')) {
-      cpSync('examples/basic/jobs', join(tmpRoot, 'jobs'), { recursive: true })
-    } else {
-      mkdirSync(join(tmpRoot, 'jobs'), { recursive: true })
-    }
-    mkdirSync(join(tmpRoot, 'out'), { recursive: true })
+    // Copy example data + jobs only (no user data ever)
+    cpSync('examples/basic/data', join(root, 'data'), { recursive: true })
+    cpSync('examples/basic/jobs', join(root, 'jobs'), { recursive: true })
+    mkdirSync(join(root, 'out'), { recursive: true })
 
-    // Pre-build generic CV so the Output page has something to show
-    console.log('[…] Pre-building example CV…')
+    console.log('[…] Building example CV (Jordan Blake)…')
+    const outDir = join(root, 'out')
     try {
       execSync(
-        `CV_PROJECT_ROOT="${tmpRoot}" uv run cv build --job false`,
+        `uv run cv build --data "${join(root, 'data')}" --job false`,
         { stdio: 'pipe' }
       )
-      console.log('[✓] Example CV built')
+      // Move built files to our temp out/
+      execSync(`mv out/cv_generic.* "${outDir}/" 2>/dev/null || true`, { shell: true, stdio: 'pipe' })
+
+      execSync(
+        `uv run cv build --data "${join(root, 'data')}" --job "${join(root, 'jobs/backend_engineer.md')}"`,
+        { stdio: 'pipe' }
+      )
+      execSync(`mv out/cv_job_*.* "${outDir}/" 2>/dev/null || true`, { shell: true, stdio: 'pipe' })
+
+      console.log('[✓] Build done —', execSync(`ls "${outDir}"`).toString().trim().replace(/\n/g, ', '))
     } catch (e) {
-      console.warn('[!] Pre-build failed (Output page may be empty):', e.stderr?.toString().slice(0, 200))
+      console.warn('[!] Build failed — output page may be empty\n', e.stderr?.toString().slice(0, 300))
     }
 
-    // ── 2. Start backend against tmpRoot ─────────────────────────────────────
-    console.log('[…] Starting backend with example data…')
-    const backend = spawn(
-      'uv', ['run', '--extra', 'app', 'cv-app'],
-      {
-        env: { ...process.env, CV_PROJECT_ROOT: tmpRoot },
-        stdio: 'pipe',
-      }
-    )
+    // ── 2. Start backend ────────────────────────────────────────────────────
+    console.log('[…] Starting backend…')
+    const backend = spawn('uv', ['run', '--extra', 'app', 'cv-app'], {
+      env: { ...process.env, CV_PROJECT_ROOT: root },
+      stdio: 'pipe',
+    })
     backend.on('error', e => { throw e })
 
     try {
@@ -89,75 +74,131 @@ async function main() {
       console.log('[✓] Backend ready')
 
       mkdirSync(OUT_DIR, { recursive: true })
-
       const browser = await chromium.launch()
+
+      // Shared context — dark mode, 1280×800
       const ctx = await browser.newContext({
         viewport: { width: 1280, height: 800 },
         colorScheme: 'dark',
       })
 
-      // ── Dashboard ──────────────────────────────────────────────────────────
+      // ── Screenshot 1: Dashboard — post-parse "done" state ─────────────────
+      // We mock /api/ingest/pdf so the UI shows the parse-complete checklist
+      // without needing a real LLM call.
       {
         const page = await ctx.newPage()
-        // Clear onboarding flag so Getting Started checklist is visible
-        await page.goto(FRONTEND_URL, { waitUntil: 'networkidle' })
+
+        // Show Getting Started checklist
+        await page.goto(FRONTEND, { waitUntil: 'networkidle' })
         await page.evaluate(() => localStorage.removeItem('ats_onboarded'))
+
+        // Mock the upload + ingest endpoints so the UI reaches "parse done" state
+        await page.route('**/api/upload/cv-pdf', route =>
+          route.fulfill({ status: 200, contentType: 'application/json',
+            body: JSON.stringify({ saved: true, path: 'data/cv.pdf' }) }))
+
+        await page.route('**/api/ingest/pdf', route =>
+          route.fulfill({ status: 200, contentType: 'application/json',
+            body: JSON.stringify({
+              written: [
+                'data/profile.md', 'data/skills.md', 'data/education.md',
+                'data/projects/proj_backend_platform.md',
+                'data/projects/proj_observability.md',
+              ],
+              warnings: [],
+            })
+          }))
+
         await page.reload({ waitUntil: 'networkidle' })
-        await wait(600)
+        await wait(400)
+
+        // Simulate: choose a PDF file (triggers uploadDone = true)
+        await page.evaluate(() => {
+          // Directly set the upload-done state by dispatching a fake successful upload.
+          // We trigger the hidden file input's change event with a dummy File.
+          const input = document.querySelector('input[type=file]')
+          if (!input) return
+          const dt = new DataTransfer()
+          dt.items.add(new File(['%PDF-1.4'], 'cv.pdf', { type: 'application/pdf' }))
+          Object.defineProperty(input, 'files', { value: dt.files })
+          input.dispatchEvent(new Event('change', { bubbles: true }))
+        })
+        await wait(1200)  // wait for upload mock to resolve
+
+        // Now click "Parse with AI →"
+        const parseBtn = page.locator('button', { hasText: 'Parse with AI' })
+        if (await parseBtn.isVisible().catch(() => false)) {
+          await parseBtn.click()
+          await wait(800)
+        }
+
         await page.screenshot({ path: `${OUT_DIR}/dashboard.png` })
         await page.close()
         console.log('[✓] dashboard.png')
       }
 
-      // ── Profile editor (open profile.md → shows filled form) ──────────────
+      // ── Screenshot 2: Profile editor — profile.md open with filled form ───
       {
         const page = await ctx.newPage()
-        await page.goto(`${FRONTEND_URL}/data`, { waitUntil: 'networkidle' })
+        await page.goto(`${FRONTEND}/data`, { waitUntil: 'networkidle' })
         await wait(600)
-        // Click profile.md in the file tree to open the filled profile form
-        await clickFile(page, 'profile.md')
-        await wait(600)
+
+        // Click "profile" in the PROFILE section (stripPrefix removes .md)
+        const profileBtn = page.locator('button', { hasText: /^profile$/ }).first()
+        if (await profileBtn.isVisible().catch(() => false)) {
+          await profileBtn.click()
+          await wait(900)  // let form load
+        }
+
         await page.screenshot({ path: `${OUT_DIR}/profile.png` })
         await page.close()
         console.log('[✓] profile.png')
       }
 
-      // ── Target jobs ────────────────────────────────────────────────────────
+      // ── Screenshot 3: Target Jobs — job description open ──────────────────
       {
         const page = await ctx.newPage()
-        await page.goto(`${FRONTEND_URL}/jobs`, { waitUntil: 'networkidle' })
-        await wait(800)
-        // Open first job file if any
-        const firstJob = page.locator('button').filter({ hasText: '.md' }).first()
-        if (await firstJob.isVisible().catch(() => false)) {
-          await firstJob.click()
-          await wait(600)
+        await page.goto(`${FRONTEND}/jobs`, { waitUntil: 'networkidle' })
+        await wait(600)
+
+        // Click first job file button
+        const jobBtn = page.locator('button').filter({ hasText: 'backend_engineer' }).first()
+        if (await jobBtn.isVisible().catch(() => false)) {
+          await jobBtn.click()
+          await wait(700)
+        } else {
+          // fallback: first .md button
+          const any = page.locator('button').filter({ hasText: /\.md/ }).first()
+          if (await any.isVisible().catch(() => false)) { await any.click(); await wait(700) }
         }
+
         await page.screenshot({ path: `${OUT_DIR}/jobs.png` })
         await page.close()
         console.log('[✓] jobs.png')
       }
 
-      // ── Generated CVs (Output page) ────────────────────────────────────────
+      // ── Screenshot 4: Generated CVs — PDF selected ────────────────────────
       {
         const page = await ctx.newPage()
-        await page.goto(`${FRONTEND_URL}/output`, { waitUntil: 'networkidle' })
-        await wait(800)
-        // Click first PDF in list if present
-        const firstPdf = page.locator('button').filter({ hasText: '.pdf' }).first()
-        if (await firstPdf.isVisible().catch(() => false)) {
-          await firstPdf.click()
-          await wait(1000)
+        await page.goto(`${FRONTEND}/output`, { waitUntil: 'networkidle' })
+        await wait(600)
+
+        // Click first PDF in list
+        const pdfBtn = page.locator('button').filter({ hasText: /\.pdf/ }).first()
+        if (await pdfBtn.isVisible().catch(() => false)) {
+          await pdfBtn.click()
+          await wait(1200)  // PDF viewer needs time
         }
+
         await page.screenshot({ path: `${OUT_DIR}/output.png` })
         await page.close()
         console.log('[✓] output.png')
       }
 
-      // ── Gen Config ─────────────────────────────────────────────────────────
+      // ── Screenshot 5: Gen Config ───────────────────────────────────────────
       {
         const page = await ctx.newPage()
-        await page.goto(`${FRONTEND_URL}/build`, { waitUntil: 'networkidle' })
+        await page.goto(`${FRONTEND}/build`, { waitUntil: 'networkidle' })
         await wait(600)
         await page.screenshot({ path: `${OUT_DIR}/config.png` })
         await page.close()
@@ -168,12 +209,12 @@ async function main() {
 
     } finally {
       backend.kill()
-      await wait(500)
+      await wait(300)
     }
 
   } finally {
-    rmSync(tmpRoot, { recursive: true, force: true })
-    console.log('[i] Cleaned up temp dir — no personal data was used')
+    rmSync(root, { recursive: true, force: true })
+    console.log('[i] Temp dir removed — no personal data was used')
   }
 
   console.log(`\n[✓] Screenshots saved to ${OUT_DIR}/`)
