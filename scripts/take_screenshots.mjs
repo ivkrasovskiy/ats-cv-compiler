@@ -61,8 +61,12 @@ async function main() {
       console.warn('[!] Build failed — output page may be empty\n', e.stderr?.toString().slice(0, 300))
     }
 
-    // ── 2. Start backend (no reload — reload uses multiprocessing spawn on
-    //       macOS which doesn't inherit env vars into the worker process) ─────
+    // ── 2. Start backend (kill any stale process on :8000 first) ─────────────
+    // reload=False: uvicorn --reload uses multiprocessing "spawn" on macOS
+    // which does NOT inherit env vars → CV_PROJECT_ROOT would be lost.
+    try {
+      execSync('lsof -ti:8000 | xargs kill -9 2>/dev/null; sleep 0.5', { shell: true, stdio: 'pipe' })
+    } catch {}
     console.log('[…] Starting backend…')
     const backend = spawn('uv', [
       'run', '--extra', 'app', 'python', '-c',
@@ -181,17 +185,22 @@ async function main() {
         console.log('[✓] jobs.png')
       }
 
-      // ── Screenshot 4: Generated CVs — PDF selected ────────────────────────
+      // ── Screenshot 4: Generated CVs — PDF preview open ───────────────────
       {
         const page = await ctx.newPage()
         await page.goto(`${FRONTEND}/output`, { waitUntil: 'networkidle' })
         await wait(600)
 
-        // Click first PDF in list
-        const pdfBtn = page.locator('button').filter({ hasText: /\.pdf/ }).first()
-        if (await pdfBtn.isVisible().catch(() => false)) {
-          await pdfBtn.click()
-          await wait(1200)  // PDF viewer needs time
+        // Headless Chromium doesn't render PDFs in iframes (plugin disabled).
+        // Click "View MD" on the job-targeted CV to show the generated markdown content.
+        // The markdown renders fully and makes a great product screenshot.
+        const viewMdBtns = page.locator('button', { hasText: 'View MD' })
+        const count = await viewMdBtns.count()
+        // Second "View MD" belongs to cv_job_backend_engineer (more interesting)
+        const viewMdBtn = count >= 2 ? viewMdBtns.nth(1) : viewMdBtns.first()
+        if (await viewMdBtn.isVisible().catch(() => false)) {
+          await viewMdBtn.click()
+          await wait(800)
         }
 
         await page.screenshot({ path: `${OUT_DIR}/output.png` })
