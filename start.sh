@@ -58,7 +58,20 @@ BACK=$!
 
 trap "kill \$BACK 2>/dev/null; wait \$BACK 2>/dev/null" EXIT INT TERM
 
-ok "Backend started (PID $BACK)"
+# ── Step 4 — Wait for backend to be ready ────────────────────────────────────
+printf '[…] Waiting for backend...\n'
+_deadline=$(( $(date +%s) + 20 ))
+while [ "$(date +%s)" -lt "$_deadline" ]; do
+    if curl -sf http://localhost:8000/api/health > /dev/null 2>&1; then
+        break
+    fi
+    sleep 0.4
+done
+if ! curl -sf http://localhost:8000/api/health > /dev/null 2>&1; then
+    fail "Backend did not start within 20 seconds" "Check logs above for errors"
+fi
+
+ok "Backend ready (PID $BACK)"
 printf '\n'
 printf '  Backend  → http://localhost:8000\n'
 printf '  Frontend → http://localhost:5173  ← open this in your browser\n'
@@ -66,5 +79,5 @@ printf '\n'
 printf '  Press Ctrl-C to stop both.\n'
 printf '\n'
 
-# ── Step 4 — Start frontend (blocks until Ctrl-C) ─────────────────────────────
+# ── Step 5 — Start frontend (blocks until Ctrl-C) ─────────────────────────────
 cd app/frontend && npm run dev
