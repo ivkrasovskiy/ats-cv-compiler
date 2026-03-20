@@ -59,6 +59,10 @@ For formal education entries provide:
 ## Dates
 Use "YYYY-MM" when the month is known (e.g. "2020-03"), or "YYYY" when only the year is available (e.g. "2020"). Use empty string if the date is completely unknown. For ongoing/current roles use empty string for end_date.
 
+## Email
+Put the email address in the top-level `email` field (e.g. `"email": "foo@example.com"`).
+Do NOT add it as a link in the `links` array — not even as a `mailto:` URL.
+
 ## Links
 For profile links such as LinkedIn, GitHub, Telegram, and personal websites:
 - Set `label` to the service name (e.g. "LinkedIn", "GitHub", "Telegram")
@@ -66,6 +70,7 @@ For profile links such as LinkedIn, GitHub, Telegram, and personal websites:
 - If a section at the end of the prompt lists hyperlinks found in PDF annotations, match each URL to the
   correct label by domain: linkedin.com → LinkedIn, github.com → GitHub, t.me → Telegram, etc.
 - If no URL can be determined, set `url` to an empty string
+- Do NOT include email addresses or `mailto:` links here
 
 PDF_TEXT:
 {{PDF_TEXT}}

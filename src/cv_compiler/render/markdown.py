@@ -95,13 +95,16 @@ def build_markdown(
     contact_parts: list[str] = [data.profile.headline, data.profile.location]
     if data.profile.email:
         contact_parts.append(data.profile.email)
-    contact_parts.extend(
-        [
-            f"[{link.label}]({link.url})" if link.label else link.url
-            for link in data.profile.links
-            if link.url
-        ]
-    )
+    for link in data.profile.links:
+        if not link.url:
+            continue
+        if link.url.startswith("mailto:"):
+            # Render email as plain address, not a hyperlink
+            email_addr = link.url[len("mailto:"):]
+            if email_addr and email_addr not in contact_parts:
+                contact_parts.append(email_addr)
+        else:
+            contact_parts.append(f"[{link.label}]({link.url})" if link.label else link.url)
     contact_line = " - ".join(part for part in contact_parts if part)
     if contact_line:
         add_line(contact_line)

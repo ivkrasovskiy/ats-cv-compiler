@@ -206,13 +206,26 @@ def parse_ingest_payload(payload: object) -> ParsedCv:
         raise ValueError("Missing or invalid profile section")
 
     links = _parse_links(profile_raw.get("links"))
+    email = _coerce_str(profile_raw.get("email"))
+
+    # LLMs often put the email as a mailto: link instead of the email field.
+    # Normalise: extract it from links, store in email field, drop the mailto link.
+    clean_links: list[ParsedLink] = []
+    for link in links:
+        if link.url and link.url.startswith("mailto:"):
+            addr = link.url[len("mailto:"):]
+            if addr and not email:
+                email = addr
+        else:
+            clean_links.append(link)
+
     profile = ParsedProfile(
         name=_coerce_str(profile_raw.get("name")),
         headline=_coerce_str(profile_raw.get("headline")),
         location=_coerce_str(profile_raw.get("location")),
-        email=_coerce_str(profile_raw.get("email")),
+        email=email,
         about_me=_coerce_str(profile_raw.get("about_me")),
-        links=links,
+        links=tuple(clean_links),
     )
 
     experience = _parse_experience(payload.get("experience"))
