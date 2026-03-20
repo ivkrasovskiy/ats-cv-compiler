@@ -70,10 +70,18 @@ export function JobsPage() {
 
   const outNames = new Set((outQ.data ?? []).map((f: FileItem) => f.name))
 
-  const hasCv = (jobName: string) => {
+  // The pipeline names the output cv_<job.id>.pdf where job.id comes from the job
+  // file's frontmatter `id` field. If that id starts with "job_" (e.g. job_google)
+  // the output is cv_job_google.pdf; otherwise it's cv_<stem>.pdf.
+  // So we check both possibilities.
+  const cvFileName = (jobName: string): string | null => {
     const base = jobName.replace(/\.md$/, '')
-    return outNames.has(`cv_job_${base}.pdf`)
+    if (outNames.has(`cv_job_${base}.pdf`)) return `cv_job_${base}.pdf`
+    if (outNames.has(`cv_${base}.pdf`)) return `cv_${base}.pdf`
+    return null
   }
+
+  const hasCv = (jobName: string) => cvFileName(jobName) !== null
 
   const handleGenerate = async (jobName: string) => {
     try {
@@ -248,7 +256,7 @@ export function JobsPage() {
                     )}
                     {hasCv(f.name) && (
                       <a
-                        href={`/api/out/cv_job_${f.name.replace(/\.md$/, '')}.pdf`}
+                        href={`/api/out/${cvFileName(f.name)}`}
                         download
                         className="rounded bg-slate-700 px-3 py-1 text-xs text-slate-200 hover:bg-slate-600"
                       >
@@ -309,7 +317,7 @@ export function JobsPage() {
                 {/* PDF preview */}
                 {previewJob === f.name && (
                   <iframe
-                    src={`/api/out/cv_job_${f.name.replace(/\.md$/, '')}.pdf`}
+                    src={`/api/out/${cvFileName(f.name)}`}
                     className="h-64 w-full mt-2 rounded"
                     title="CV Preview"
                   />
@@ -320,7 +328,7 @@ export function JobsPage() {
                     doneExtra={
                       <div className="flex flex-wrap items-center gap-2 mt-1">
                         <a
-                          href={`/api/out/cv_job_${f.name.replace(/\.md$/, '')}.pdf`}
+                          href={`/api/out/${cvFileName(f.name)}`}
                           download
                           className="rounded bg-green-800 px-3 py-1 text-xs font-medium text-green-100 hover:bg-green-700"
                         >
