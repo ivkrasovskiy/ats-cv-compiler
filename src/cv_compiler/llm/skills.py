@@ -124,7 +124,12 @@ def parse_skill_selection(text: str, *, allowed_skills: tuple[str, ...]) -> tupl
             raise ValueError(f"Unknown skill selected: {item!r}")
         selected.append(allowed_map[key])
         seen.add(key)
+        if len(selected) >= _MAX_SELECTED_SKILLS:
+            break
     return tuple(selected)
+
+
+_MAX_SELECTED_SKILLS = 25
 
 
 def skills_select_schema() -> dict[str, object]:
@@ -139,6 +144,7 @@ def skills_select_schema() -> dict[str, object]:
                 "properties": {
                     "selected_skills": {
                         "type": "array",
+                        "maxItems": _MAX_SELECTED_SKILLS,
                         "items": {"type": "string"},
                     }
                 },
