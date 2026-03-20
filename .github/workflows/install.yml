@@ -1,0 +1,20 @@
+name: Install smoke test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  install:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Onboard + smoke tests
+        env:
+          CV_ONBOARD_TEST: "1"
+          CV_ONBOARD_ASSISTANT: gemini   # public npm pkg, no auth needed
+        run: bash scripts/onboard_test.sh

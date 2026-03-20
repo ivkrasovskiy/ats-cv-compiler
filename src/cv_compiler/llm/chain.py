@@ -24,6 +24,7 @@ from cv_compiler.llm.base import (
 from cv_compiler.llm.bullet_polish import build_bullet_polish_prompt, parse_bullet_polish_response
 from cv_compiler.llm.chain_config import AgentChainConfig
 from cv_compiler.llm.codex import _extract_json_payload
+from cv_compiler.llm.cover_letter import build_cover_letter_prompt, parse_cover_letter
 from cv_compiler.llm.experience import (
     build_experience_prompt,
     load_experience_templates,
@@ -36,14 +37,21 @@ from cv_compiler.llm.job_analysis import (
     parse_job_analysis,
     write_job_analysis,
 )
-from cv_compiler.llm.skills import build_skills_prompt, parse_skill_highlights
+from cv_compiler.llm.skills import (
+    build_skills_prompt,
+    build_skills_select_prompt,
+    parse_skill_highlights,
+    parse_skill_selection,
+)
 from cv_compiler.llm.summary import build_experience_summary_prompt, parse_experience_summary
-from cv_compiler.schema.models import JobSpec, Profile, ProjectEntry
+from cv_compiler.schema.models import ExperienceEntry, JobSpec, Profile, ProjectEntry
 
 _JOB_ANALYSIS_PROMPT_PATH = Path("prompts/agents/job_analysis_prompt.md")
 _EXPERIENCE_PROMPT_PATH = Path("prompts/experience_prompt.md")
 _SKILLS_PROMPT_PATH = Path("prompts/skills_highlight_prompt.md")
+_SKILLS_SELECT_PROMPT_PATH = Path("prompts/skills_select_prompt.md")
 _SUMMARY_PROMPT_PATH = Path("prompts/experience_summary_prompt.md")
+_COVER_LETTER_PROMPT_PATH = Path("prompts/cover_letter_prompt.md")
 _TEMPLATES_PATH = Path("prompts/experience_templates.yaml")
 
 _NUM_RE = re.compile(r"\d+(?:\.\d+)?%?")
@@ -147,6 +155,26 @@ class AgentChainProvider:
 
         return highlighted
 
+    def select_skills(
+        self,
+        skills_with_scores: Sequence[tuple[str, int, int]],
+        profile: Profile,
+        job: JobSpec,
+    ) -> Sequence[str]:
+        job_analysis = self._ensure_job_analysis(job)
+
+        prompt = build_skills_select_prompt(
+            _SKILLS_SELECT_PROMPT_PATH,
+            skills_with_scores=tuple(skills_with_scores),
+            profile=profile,
+            job=job,
+        )
+        prompt = _inject_job_context(prompt, job_analysis)
+        output = self._run_agent(prompt, timeout=self._config.timeout_skills)
+        payload = _extract_json_payload(output)
+        allowed = tuple(s for s, _, __ in skills_with_scores)
+        return parse_skill_selection(payload, allowed_skills=allowed)
+
     def generate_experience_summary(
         self,
         projects: Sequence[ProjectEntry],
@@ -174,6 +202,25 @@ class AgentChainProvider:
             summary = truncated
 
         return summary
+
+    def generate_cover_letter(
+        self,
+        profile: Profile,
+        experience: Sequence[ExperienceEntry],
+        job: JobSpec,
+    ) -> str:
+        job_analysis = self._ensure_job_analysis(job)
+
+        prompt = build_cover_letter_prompt(
+            _COVER_LETTER_PROMPT_PATH,
+            profile=profile,
+            experience=tuple(experience),
+            job=job,
+        )
+        prompt = _inject_job_context(prompt, job_analysis)
+        output = self._run_agent(prompt, timeout=self._config.timeout_summary)
+        payload = _extract_json_payload(output)
+        return parse_cover_letter(payload)
 
     def _ensure_job_analysis(self, job: JobSpec | None) -> JobAnalysis | None:
         """Load existing or generate new job analysis. Returns None if no job."""

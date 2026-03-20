@@ -1,27 +1,42 @@
 # ats-cv-compiler
 
-## Quick Start (5 minutes)
+## Web app
 
-**Requires:** git, Node.js (npm is used to install the AI assistant)
+| Dashboard | Profile editor | Target jobs |
+|-----------|---------------|-------------|
+| ![Dashboard](docs/screenshots/dashboard.png) | ![Profile](docs/screenshots/profile.png) | ![Jobs](docs/screenshots/jobs.png) |
+
+| Generated CVs | Gen Config |
+|--------------|-----------|
+| ![Output](docs/screenshots/output.png) | ![Config](docs/screenshots/config.png) |
+
+**Dashboard** — upload your CV PDF, parse it with AI, build generic or job-targeted CVs.
+**Profile** — review and edit all extracted data: profile, skills, education, projects.
+**Target Jobs** — paste job descriptions to get a tailored CV for each role.
+**Generated CVs** — preview and download your built PDFs.
+**Gen Config** — configure the AI provider (Gemini, Claude, or custom endpoint).
+
+---
+
+## Getting started
+
+**Prerequisites:** Git and internet. Everything else is installed automatically.
 
 ```bash
 git clone https://github.com/you/ats-cv-compiler
 cd ats-cv-compiler
-bash onboard.sh   # installs uv + AI assistant (Gemini CLI or Claude Code), then opens it
+bash onboard.sh      # installs all dependencies + walkthrough
+bash start.sh        # → http://localhost:5173
 ```
 
-The assistant will guide you through the rest — editing your data and building your first CV.
-
-The script will ask which assistant to install:
-- **Gemini CLI** — free with any Google account (recommended for most users)
-- **Claude Code** — requires a paid Claude Pro subscription
-
-**Already have uv and an AI assistant (gemini or claude)?**
+CLI only (no web app):
 ```bash
-uv sync
-uv run cv doctor   # check everything is ready
 uv run cv build --job false
 ```
+
+The script will ask which AI assistant to install:
+- **Gemini CLI** — free with any Google account (recommended for most users)
+- **Claude Code** — requires a paid Claude Pro subscription
 
 ---
 

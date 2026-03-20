@@ -77,6 +77,11 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Generate a one-time experience summary (worth mentioning) if missing.",
     )
     build.add_argument(
+        "--cover-letter",
+        action="store_true",
+        help="Generate a cover letter for the target job (requires --job and --llm).",
+    )
+    build.add_argument(
         "--no-pdf",
         action="store_true",
         help="Skip PDF rendering; write only the Markdown output.",
@@ -250,10 +255,16 @@ def main(argv: Sequence[str] | None = None) -> int:
                 if args.no_pdf:
                     print("--from-markdown requires PDF output (omit --no-pdf).", file=sys.stderr)
                     return 2
-                if args.llm or args.job or args.experience_regenerate or args.experience_summary:
+                if (
+                    args.llm
+                    or args.job
+                    or args.experience_regenerate
+                    or args.experience_summary
+                    or args.cover_letter
+                ):
                     print(
-                        "--from-markdown cannot be combined with --llm, --job, or "
-                        "--experience-regenerate, or --experience-summary.",
+                        "--from-markdown cannot be combined with --llm, --job, "
+                        "--experience-regenerate, --experience-summary, or --cover-letter.",
                         file=sys.stderr,
                     )
                     return 2
@@ -347,6 +358,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                             llm_instructions_path=None,
                             experience_regenerate=args.experience_regenerate,
                             experience_summary=args.experience_summary,
+                            cover_letter=args.cover_letter,
                         )
                     )
                 except NotImplementedError as e:

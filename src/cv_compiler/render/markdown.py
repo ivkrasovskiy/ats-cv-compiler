@@ -92,13 +92,28 @@ def build_markdown(
         add_line(f"## {title}")
 
     add_line(f"# {data.profile.name}")
-    contact_parts: list[str] = [data.profile.headline, data.profile.location]
+
+    # Line 1: headline + location (plain text)
+    headline_parts = [p for p in [data.profile.headline, data.profile.location] if p]
+    if headline_parts:
+        add_line(" - ".join(headline_parts))
+
+    # Line 2: email + links (contacts)
+    contact_parts: list[str] = []
     if data.profile.email:
         contact_parts.append(data.profile.email)
-    contact_parts.extend([link.url for link in data.profile.links if link.url])
-    contact_line = " - ".join(part for part in contact_parts if part)
-    if contact_line:
-        add_line(contact_line)
+    for link in data.profile.links:
+        if not link.url:
+            continue
+        if link.url.startswith("mailto:"):
+            # Defensive: normalise mailto that wasn't caught at ingest
+            email_addr = link.url[len("mailto:"):]
+            if email_addr and email_addr not in contact_parts:
+                contact_parts.append(email_addr)
+        else:
+            contact_parts.append(f"[{link.label}]({link.url})" if link.label else link.url)
+    if contact_parts:
+        add_line(" - ".join(contact_parts))
 
     if data.profile.about_me:
         add_section("About Me")
@@ -215,4 +230,4 @@ def _bold_first_keyword(text: str) -> str:
 
 
 def _fix_spacing(text: str) -> str:
-    return re.sub(r"([A-Za-z])(\d)", r"\\1 \\2", text)
+    return re.sub(r"([A-Za-z])(\d)", r"\1 \2", text)

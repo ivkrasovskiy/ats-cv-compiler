@@ -1,0 +1,62 @@
+import React from 'react'
+import CodeMirror from '@uiw/react-codemirror'
+import { yaml } from '@codemirror/lang-yaml'
+import { markdown } from '@codemirror/lang-markdown'
+import { vscodeDark } from '@uiw/codemirror-theme-vscode'
+
+interface Props {
+  path: string
+  content: string
+  onChange: (value: string) => void
+  onSave: () => void
+  onCancel?: () => void
+  saving: boolean
+  saved: boolean
+  extraActions?: React.ReactNode
+  lang?: 'yaml' | 'markdown'
+}
+
+function langExtension(path: string, lang?: 'yaml' | 'markdown') {
+  if (lang === 'yaml') return yaml()
+  if (lang === 'markdown') return markdown()
+  if (path.endsWith('.yaml') || path.endsWith('.yml')) return yaml()
+  return markdown()
+}
+
+export function FileEditor({ path, content, onChange, onSave, onCancel, saving, saved, extraActions, lang }: Props) {
+  return (
+    <div className="flex h-full flex-col">
+      <div className="flex items-center justify-between border-b border-slate-700 px-4 py-2">
+        <span className="font-mono text-sm text-slate-400">{path}</span>
+        <div className="flex gap-2">
+          {extraActions}
+          {onCancel && (
+            <button
+              onClick={onCancel}
+              className="rounded bg-slate-700 px-3 py-1 text-sm text-slate-300 hover:bg-slate-600"
+            >
+              Cancel
+            </button>
+          )}
+          <button
+            onClick={onSave}
+            disabled={saving}
+            className="rounded bg-indigo-600 px-3 py-1 text-sm text-white transition-colors hover:bg-indigo-500 disabled:opacity-50"
+          >
+            {saving ? 'Saving…' : saved ? '✓ Saved' : 'Save'}
+          </button>
+        </div>
+      </div>
+      <div className="flex-1 overflow-auto">
+        <CodeMirror
+          value={content}
+          extensions={[langExtension(path, lang)]}
+          theme={vscodeDark}
+          onChange={onChange}
+          height="100%"
+          style={{ height: '100%' }}
+        />
+      </div>
+    </div>
+  )
+}

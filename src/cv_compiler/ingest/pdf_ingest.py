@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import re
 import shutil
+import subprocess
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -17,6 +18,7 @@ from urllib.request import Request, urlopen
 
 import yaml
 
+from cv_compiler.llm.codex import CodexExecConfig
 from cv_compiler.llm.config import LLMConfig
 from cv_compiler.llm.openai import build_chat_endpoint, build_chat_payload, extract_chat_content
 
@@ -114,12 +116,42 @@ def extract_pdf_text(path: Path) -> str:
     return combined
 
 
+def extract_pdf_hyperlinks(path: Path) -> list[str]:
+    """Extract all URI hyperlinks from PDF link annotations."""
+    try:
+        from pypdf import PdfReader
+    except ImportError:  # pragma: no cover
+        return []
+    reader = PdfReader(str(path))
+    urls: list[str] = []
+    seen: set[str] = set()
+    for page in reader.pages:
+        if "/Annots" not in page:
+            continue
+        for annot_ref in page["/Annots"]:
+            try:
+                annot = annot_ref.get_object()
+            except Exception:
+                continue
+            if annot.get("/Subtype") != "/Link":
+                continue
+            action = annot.get("/A")
+            if action is None:
+                continue
+            uri = action.get("/URI")
+            if uri and isinstance(uri, str) and uri not in seen:
+                seen.add(uri)
+                urls.append(uri)
+    return urls
+
+
 def ingest_pdf_to_markdown(
     *,
     data_dir: Path,
     pdf_path: Path,
     llm_mode: str,
-    llm_config: LLMConfig | None,
+    llm_config: LLMConfig | None = None,
+    codex_config: CodexExecConfig | None = None,
     prompt_path: Path = Path("prompts/pdf_ingest_prompt.md"),
     overwrite: bool = False,
     request_path: Path | None = None,
@@ -129,13 +161,18 @@ def ingest_pdf_to_markdown(
 ) -> IngestResult:
     """Convert a PDF CV into canonical Markdown files under `data_dir`."""
     text = extract_pdf_text(pdf_path)
-    prompt = _build_ingest_prompt(prompt_path, text)
+    hyperlinks = extract_pdf_hyperlinks(pdf_path)
+    prompt = _build_ingest_prompt(prompt_path, text, hyperlinks)
 
     payload = build_chat_payload(manual_model, prompt, _ingest_schema())
     if llm_mode == "api":
         if llm_config is None:
             raise ValueError("Missing LLM config for API mode")
         content = _request_llm_content(llm_config, prompt)
+    elif llm_mode == "cli":
+        if codex_config is None:
+            raise ValueError("Missing codex config for CLI mode")
+        content = _cli_llm_content(codex_config, prompt)
     elif llm_mode == "offline":
         if request_path is None or response_path is None:
             raise ValueError("Offline mode requires request/response paths")
@@ -169,13 +206,26 @@ def parse_ingest_payload(payload: object) -> ParsedCv:
         raise ValueError("Missing or invalid profile section")
 
     links = _parse_links(profile_raw.get("links"))
+    email = _coerce_str(profile_raw.get("email"))
+
+    # LLMs often put the email as a mailto: link instead of the email field.
+    # Normalise: extract it from links, store in email field, drop the mailto link.
+    clean_links: list[ParsedLink] = []
+    for link in links:
+        if link.url and link.url.startswith("mailto:"):
+            addr = link.url[len("mailto:"):]
+            if addr and not email:
+                email = addr
+        else:
+            clean_links.append(link)
+
     profile = ParsedProfile(
         name=_coerce_str(profile_raw.get("name")),
         headline=_coerce_str(profile_raw.get("headline")),
         location=_coerce_str(profile_raw.get("location")),
-        email=_coerce_str(profile_raw.get("email")),
+        email=email,
         about_me=_coerce_str(profile_raw.get("about_me")),
-        links=links,
+        links=tuple(clean_links),
     )
 
     experience = _parse_experience(payload.get("experience"))
@@ -212,7 +262,7 @@ def write_ingest_files(data_dir: Path, parsed: ParsedCv, *, overwrite: bool) -> 
             "links": [
                 {
                     "label": _require_field(link.label, "profile.links.label", warnings),
-                    "url": link.url,
+                    "url": link.url or "",
                 }
                 for link in parsed.profile.links
                 if link.label or link.url
@@ -309,9 +359,14 @@ def write_ingest_files(data_dir: Path, parsed: ParsedCv, *, overwrite: bool) -> 
     return IngestResult(written_paths=tuple(written), warnings=tuple(warnings))
 
 
-def _build_ingest_prompt(path: Path, pdf_text: str) -> str:
+def _build_ingest_prompt(path: Path, pdf_text: str, hyperlinks: list[str] | None = None) -> str:
     prompt = path.read_text(encoding="utf-8")
-    return prompt.replace("{{PDF_TEXT}}", pdf_text.strip())
+    text = pdf_text.strip()
+    if hyperlinks:
+        links_block = "\n\n[HYPERLINKS FOUND IN PDF ANNOTATIONS]\n"
+        links_block += "\n".join(f"- {url}" for url in hyperlinks)
+        text = text + links_block
+    return prompt.replace("{{PDF_TEXT}}", text)
 
 
 def _request_llm_content(config: LLMConfig, prompt: str) -> str:
@@ -329,6 +384,30 @@ def _request_llm_content(config: LLMConfig, prompt: str) -> str:
     if content is None:
         raise ValueError("Unexpected LLM response shape")
     return content
+
+
+def _cli_llm_content(config: CodexExecConfig, prompt: str) -> str:
+    cmd = [config.command, *config.args]
+    try:
+        result = subprocess.run(
+            cmd,
+            input=prompt.encode("utf-8"),
+            capture_output=True,
+            timeout=config.timeout_seconds,
+            check=False,
+        )
+    except FileNotFoundError as exc:
+        raise ValueError(
+            f"CLI command not found: {config.command}. Is it installed and on your PATH?"
+        ) from exc
+    if result.returncode != 0:
+        stderr = result.stderr.decode("utf-8", errors="replace").strip()
+        raise ValueError(f"CLI LLM failed (exit {result.returncode}): {stderr or 'unknown error'}")
+    raw = result.stdout.decode("utf-8", errors="replace").strip()
+    # Strip markdown code fences if present
+    raw = re.sub(r"^```(?:json)?\s*", "", raw)
+    raw = re.sub(r"\s*```$", "", raw)
+    return raw.strip()
 
 
 def _manual_llm_content(
@@ -393,8 +472,8 @@ def _parse_experience(value: object) -> tuple[ParsedExperience, ...]:
                 company=_coerce_str(item.get("company")),
                 title=_coerce_str(item.get("title")),
                 location=_coerce_str(item.get("location")),
-                start_date=_coerce_str(item.get("start_date")),
-                end_date=_coerce_str(item.get("end_date")),
+                start_date=_normalize_date(_coerce_str(item.get("start_date"))),
+                end_date=_normalize_date(_coerce_str(item.get("end_date")), is_end=True),
                 bullets=_coerce_str_list(item.get("bullets")),
                 tags=_coerce_str_list(item.get("tags")),
             )
@@ -414,8 +493,8 @@ def _parse_projects(value: object) -> tuple[ParsedProject, ...]:
                 name=_coerce_str(item.get("name")),
                 company=_coerce_str(item.get("company")),
                 role=_coerce_str(item.get("role")),
-                start_date=_coerce_str(item.get("start_date")),
-                end_date=_coerce_str(item.get("end_date")),
+                start_date=_normalize_date(_coerce_str(item.get("start_date"))),
+                end_date=_normalize_date(_coerce_str(item.get("end_date")), is_end=True),
                 bullets=_coerce_str_list(item.get("bullets")),
                 tags=_coerce_str_list(item.get("tags")),
             )
@@ -451,8 +530,8 @@ def _parse_education(value: object) -> tuple[ParsedEducation, ...]:
                 institution=_coerce_str(item.get("institution")),
                 degree=_coerce_str(item.get("degree")),
                 location=_coerce_str(item.get("location")),
-                start_date=_coerce_str(item.get("start_date")),
-                end_date=_coerce_str(item.get("end_date")),
+                start_date=_normalize_date(_coerce_str(item.get("start_date"))),
+                end_date=_normalize_date(_coerce_str(item.get("end_date")), is_end=True),
             )
         )
     return tuple(items)
@@ -463,6 +542,12 @@ def _coerce_str(value: object) -> str | None:
         text = value.strip()
         return text if text else None
     return None
+
+
+def _normalize_date(value: str | None, *, is_end: bool = False) -> str | None:
+    """Keep dates as-is; year-only values (YYYY) are valid and preserved."""
+    _ = is_end  # reserved for future use
+    return value
 
 
 def _coerce_str_list(value: object) -> tuple[str, ...]:
@@ -515,8 +600,8 @@ def _backup_ingest_files(data_dir: Path, *, overwrite: bool) -> Path | None:
         return None
     backup_root = data_dir.parent / "tmp"
     backup_root.mkdir(parents=True, exist_ok=True)
-    backup_dir = backup_root / f"ingest_backup_{int(time.time())}"
-    backup_dir.mkdir(parents=True, exist_ok=False)
+    backup_dir = backup_root / f"ingest_backup_{int(time.time() * 1000)}"
+    backup_dir.mkdir(parents=True, exist_ok=True)
     for path in candidates:
         rel = path.relative_to(data_dir)
         dest = backup_dir / rel

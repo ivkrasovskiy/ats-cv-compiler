@@ -1,13 +1,12 @@
 ---
 id: education
 entries:
-  - institution: "Example University"
+  - institution: "UC Berkeley"
     degree: "BSc, Computer Science"
-    location: "Remote"
-    start_date: "2017-09"
-    end_date: "2021-06"
+    location: "Berkeley, CA"
+    start_date: "2014-09"
+    end_date: "2018-05"
 languages:
-  - "English - Advanced"
-  - "Russian - Native"
-  - "Spanish - Beginner"
+  - "English - Native"
+  - "Spanish - Intermediate"
 ---

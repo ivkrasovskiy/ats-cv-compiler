@@ -5,98 +5,110 @@ This file defines how LLM agents (Codex/ChatGPT/local) must operate in this repo
 The agent is a coding assistant, not a product owner.
 
 ## Prime Directive
-Maintain a **CV compiler**:
-- CLI-first
-- deterministic pipeline by default
-- ATS-safe rendering
-- optional LLM assistance with strict non-fabrication rules
+Maintain a **CV compiler** with two interfaces:
+- **CLI** (`uv run cv ...`) — deterministic pipeline, ATS-safe rendering, optional LLM assistance
+- **Web UI** (`app/`) — FastAPI backend + React/TypeScript frontend served at `http://localhost:8000`
 
-Do NOT turn this into a web app or “AI agent platform”.
+Both interfaces share the same core pipeline (`src/cv_compiler/`). The web UI is a first-class citizen, not a prototype.
 
 ## Non-Negotiable Rules
 1. **No fabrication**: never introduce facts, metrics, employers, titles, dates, or claims not present in canonical data.
 2. **Determinism first**: generic build must not require LLMs or network access.
 3. **ATS-safe output**: no tables, no multi-column, no icons, no text boxes in the default template.
-4. **No frontend for MVP** unless explicitly requested in an issue/task.
-5. **No vector DB/RAG for MVP**. Use deterministic scoring and keyword matching.
-6. **Minimal dependencies**. Prefer stdlib; justify every new dependency.
+4. **No vector DB/RAG**. Use deterministic scoring and keyword matching.
+5. **Minimal dependencies**. Prefer stdlib; justify every new dependency.
 
 ## Project Tooling
+
+### Python (CLI + backend)
 - Use **uv** for dependencies and scripts.
 - Use **ruff** for linting and formatting (`ruff check`, `ruff format`).
 - Prefer the Astral stack; do not introduce black/isort/flake8 alongside ruff.
+- Tests: `uv run pytest`
+
+### Frontend (`app/frontend/`)
+- Framework: **React 18 + TypeScript + Vite**
+- Styling: **Tailwind CSS**
+- Data fetching: **TanStack Query**
+- Tests: **Vitest + Testing Library** (`npm --prefix app/frontend run test`)
+- Build check: `npm --prefix app/frontend run build`
 
 ## Code Quality Standards
-- Python 3.11+.
-- Type hints required for public functions.
-- Pydantic (or equivalent) for schema validation if used in the codebase.
+- Python 3.11+. Type hints required for public functions.
 - Small, testable modules; avoid heavy abstractions.
 - Add/adjust unit tests for any non-trivial logic.
+- Frontend components should have smoke tests at minimum.
+
+## Web App Architecture
+```
+app/
+  backend/          ← FastAPI app (API layer only — no business logic)
+    api/            ← route modules (build, config, doctor, files, form, health, lint)
+    services/       ← file_service, build_service
+    tests/          ← pytest tests for API routes
+  frontend/         ← React SPA
+    src/
+      api/client.ts ← all fetch calls (single source of truth)
+      components/   ← shared UI components
+      pages/        ← page-level components (DataBrowser, OutputPage, JobsPage, …)
+      hooks/        ← custom React hooks
+```
+
+The backend forwards requests to `src/cv_compiler/` — it does not re-implement pipeline logic.
 
 ## Change Management
 When modifying behavior:
 1. Update schema/validators if inputs change.
 2. Update lint rules if output constraints change.
-3. Update README/REQUIREMENTS if user-facing behavior changes.
+3. Update `app/frontend/src/api/client.ts` if API surface changes.
 4. Ensure `cv lint` remains strict and meaningful.
 
 ## Implementation Preferences
-- Prefer a pipeline:
-  - parse → validate → select → (optional rewrite) → render → lint
+- Pipeline: parse → validate → select → (optional rewrite) → render → lint
 - Keep selection deterministic and explainable.
-- LLM integration should be a provider interface with:
+- LLM integration uses a provider interface with:
   - local model option
   - external API option
-  - explicit prompts stored in-repo
+  - explicit prompts stored in `prompts/`
 
 ## Prompts & LLM Outputs
 - Prompts MUST contain:
-  - explicit “do not invent facts” instruction
+  - explicit "do not invent facts" instruction
   - constraints on length and style
-- LLM outputs MUST be attributable to inputs:
-  - preserve internal IDs or provide a mapping (even if not shown in final CV)
+- LLM outputs MUST be attributable to inputs.
 
 ## What to Ask vs What to Decide
 - If requirements are ambiguous, prefer conservative defaults that protect ATS safety and determinism.
-- If a change expands scope (UI, database, agents), stop and request explicit approval in an issue/task.
+- If a change expands core pipeline behavior significantly, confirm before proceeding.
 
 ## Definition of Done
 A change is done when:
-- ruff passes
-- unit tests pass
-- `cv lint` passes
-- output remains ATS-safe
-- the change is documented where appropriate
+- `ruff check` + `ruff format` pass (Python)
+- Python unit tests pass (`uv run pytest`)
+- Frontend tests pass (`npm --prefix app/frontend run test`)
+- `cv lint` passes on example data
+- Output remains ATS-safe
 
-## Repo Navigation Workflow (Index + Tasks)
+## Repo Navigation Workflow
 
-For non-trivial debugging/refactors, prefer this deterministic workflow:
-
-1. Regenerate the project index (updates missing module docstrings and refreshes local import graph):
-   - `uv run python scripts/project_index.py`
-   - Output: `docs/PROJECT_INDEX.md`
-2. Generate a temporary per-file task checklist (useful for breaking down work and tracking progress):
-   - `uv run python scripts/task_index.py --goal "..." `
-   - Output: `tmp/task_index.md` (git-ignored)
-3. Execute tasks top-to-bottom, updating `tmp/task_index.md` as you go.
-4. When done, clear the task index:
-   - `uv run python scripts/task_index.py --clear`
+For non-trivial debugging/refactors:
+1. Regenerate the project index:
+   - `uv run python scripts/project_index.py` → `docs/PROJECT_INDEX.md`
+2. Generate a per-file task checklist:
+   - `uv run python scripts/task_index.py --goal "..."` → `tmp/task_index.md`
+3. Execute tasks top-to-bottom, updating the checklist as you go.
+4. When done: `uv run python scripts/task_index.py --clear`
 
 ## AI Assistant Files
+- `CLAUDE.md` — instructions for Claude Code users
+- `GEMINI.md` — instructions for Gemini CLI users
 
-Two project guide files exist at the repo root — use the one matching the user's assistant:
-- `CLAUDE.md` — instructions for Claude Code users (paid Claude Pro subscription)
-- `GEMINI.md` — instructions for Gemini CLI users (free with any Google account)
-
-Both files contain identical onboarding sequences, key commands, file format references, and
-rules. The only differences are the title and rules section header.
+Both contain onboarding sequences, key commands, file format references, and rules.
 
 ## Non-Technical User Guidance
-
-When the user appears to be non-technical or is setting up for the first time:
 - Suggest `uv run cv doctor` before any manual debugging.
 - Direct them to edit only: `data/`, `jobs/`, `config/llm.env`.
 - Never ask them to edit `pyproject.toml` or run Python scripts directly.
 - Seed `data/` from `examples/basic/data/` if it doesn't exist yet.
-- Onboarding is handled by `onboard.sh` — it installs uv, the chosen AI assistant
-  (Gemini CLI or Claude Code), Python deps, and opens the assistant automatically.
+- Onboarding is handled by `onboard.sh`.
+- The web UI is available via `uv run --extra app cv-app` → `http://localhost:8000`.

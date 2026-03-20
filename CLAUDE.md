@@ -53,6 +53,7 @@ After each step, confirm the user is ready before moving on.
 | `uv run cv doctor` | Diagnose why build is failing |
 | `uv run cv lint` | Validate data files |
 | `uv run cv build --example basic` | Try the bundled example (safe to run) |
+| `uv run --extra app cv-app` | Start the local web GUI → http://localhost:8000 |
 
 ---
 
@@ -115,6 +116,21 @@ src/cv_compiler/    ← Python source
 onboard.sh          ← bootstrap script for new users
 GEMINI.md           ← project guide for Gemini CLI users
 ```
+
+---
+
+## Claude Code skills & commands
+
+A library of reusable Claude Code skills and slash commands lives at:
+
+```
+../everything-claude-code/
+  commands/   ← slash commands (e.g. /plan, /tdd, /code-review, /refactor-clean)
+  agents/     ← agent definitions
+  hooks/      ← hook scripts
+```
+
+Use these when the task matches — e.g. `/code-review` before a PR, `/tdd` for test-first work, `/plan` for large features.
 
 ---
 

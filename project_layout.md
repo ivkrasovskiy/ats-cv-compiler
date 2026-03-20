@@ -11,6 +11,7 @@ ats-cv-compiler/          # project root
   tmp/                    # temporary working files — git-ignored
   templates/              # PDF layout (fonts, spacing, sections)
   prompts/                # AI instructions for bullet rewriting and skill highlighting
+    skills_select_prompt.md  # skill selection prompt (which skills to include in CV)
     agents/               # prompts used by the --llm agents multi-agent pipeline
   examples/
     basic/                # bundled working example (safe reference, read-only)

@@ -7,6 +7,7 @@ Rendering is markdown-first to keep PDF output deterministic and editable.
 
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -15,6 +16,9 @@ from fpdf.enums import XPos, YPos
 
 from cv_compiler.render.markdown import build_markdown, normalize_markdown_text
 from cv_compiler.render.types import RenderFormat, RenderRequest, RenderResult
+
+_URL_RE = re.compile(r"https?://\S+")
+_MD_LINK_RE = re.compile(r"\[([^\]]+)\]\((https?://[^\)]+)\)")
 
 
 def render_cv(request: RenderRequest) -> RenderResult:
@@ -68,13 +72,53 @@ def render_markdown_to_pdf(markdown: str, output_path: Path) -> None:
         pdf.set_font("Helvetica", size=10)
 
     def paragraph(text: str, *, size: int = 10) -> None:
-        _render_rich_line(pdf, text, size=size)
+        pdf.set_font("Helvetica", size=size)
+        pdf.set_x(pdf.l_margin)
+        pdf.multi_cell(
+            0,
+            5,
+            _normalize_pdf_text(text),
+            markdown=True,
+            new_x=XPos.LMARGIN,
+            new_y=YPos.NEXT,
+        )
 
     def bullet(text: str) -> None:
-        _render_rich_line(pdf, f"- {text}", size=10)
+        paragraph(f"- {text}", size=10)
+
+    def contact_line(text: str) -> None:
+        """Render the contact line with clickable hyperlinks for [label](url) and bare URLs."""
+        pdf.set_font("Helvetica", size=11)
+        pdf.set_x(pdf.l_margin)
+        normalized = _normalize_pdf_text(text)
+        # Split on [label](url) patterns first; groups give [text, label, url, text, ...]
+        parts = _MD_LINK_RE.split(normalized)
+        for i in range(0, len(parts), 3):
+            segment = parts[i]
+            # Render plain text segment, highlighting any bare URLs
+            last = 0
+            for m in _URL_RE.finditer(segment):
+                start, end = m.span()
+                if start > last:
+                    pdf.write(5, segment[last:start])
+                url = m.group(0)
+                pdf.set_text_color(60, 80, 200)
+                pdf.write(5, url, link=url)
+                pdf.set_text_color(0, 0, 0)
+                last = end
+            if last < len(segment):
+                pdf.write(5, segment[last:])
+            # Render [label](url) pair that follows this segment (if any)
+            if i + 2 < len(parts):
+                label = parts[i + 1]
+                url = parts[i + 2]
+                pdf.set_text_color(60, 80, 200)
+                pdf.write(5, label, link=url)
+                pdf.set_text_color(0, 0, 0)
+        pdf.ln(5)
 
     seen_name = False
-    seen_contact = False
+    _header_lines = 0  # counts lines consumed after # Name (0=headline, 1=contacts)
     for raw_line in markdown.splitlines():
         line = raw_line.strip()
         if not line:
@@ -90,7 +134,7 @@ def render_markdown_to_pdf(markdown: str, output_path: Path) -> None:
             pdf.set_x(pdf.l_margin)
             pdf.cell(0, 8, title, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
             seen_name = True
-            seen_contact = False
+            _header_lines = 0
             continue
 
         if line == "---":
@@ -111,9 +155,23 @@ def render_markdown_to_pdf(markdown: str, output_path: Path) -> None:
             bullet(line[2:].strip())
             continue
 
-        if seen_name and not seen_contact:
-            paragraph(line, size=11)
-            seen_contact = True
+        if seen_name and _header_lines < 2:
+            if _header_lines == 0:
+                if _MD_LINK_RE.search(line):
+                    # OLD format: single line containing both headline and links.
+                    # Render the whole thing as a contacts line so links display correctly.
+                    contact_line(line)
+                    _header_lines = 2  # skip waiting for a second line
+                else:
+                    # NEW format: headline + location only, plain text, size 11
+                    pdf.set_font("Helvetica", size=11)
+                    pdf.set_x(pdf.l_margin)
+                    pdf.cell(0, 6, _normalize_pdf_text(line), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                    _header_lines = 1
+            else:
+                # NEW format second line: contacts (email + links), size 10
+                contact_line(line)
+                _header_lines = 2
             continue
 
         paragraph(line, size=10)
@@ -123,55 +181,3 @@ def render_markdown_to_pdf(markdown: str, output_path: Path) -> None:
 
 def _normalize_pdf_text(text: str) -> str:
     return normalize_markdown_text(text)
-
-
-def _split_bold(text: str) -> list[tuple[str, bool]]:
-    parts = text.split("**")
-    segments: list[tuple[str, bool]] = []
-    bold = False
-    for part in parts:
-        segments.append((part, bold))
-        bold = not bold
-    return segments
-
-
-def _render_rich_line(pdf: FPDF, text: str, *, size: int) -> None:
-    line_height = 5
-    max_width = pdf.w - pdf.l_margin - pdf.r_margin
-    tokens: list[tuple[str, bool]] = []
-    for segment, is_bold in _split_bold(text):
-        for word in segment.split():
-            tokens.append((word, is_bold))
-
-    line_tokens: list[tuple[str, bool]] = []
-    line_width = 0.0
-
-    for word, is_bold in tokens:
-        token_text = word if not line_tokens else f" {word}"
-        pdf.set_font("Helvetica", style="B" if is_bold else "", size=size)
-        token_width = pdf.get_string_width(_normalize_pdf_text(token_text))
-        if line_tokens and line_width + token_width > max_width:
-            _write_tokens_line(pdf, line_tokens, size=size, line_height=line_height)
-            line_tokens = []
-            line_width = 0.0
-            token_text = word
-            token_width = pdf.get_string_width(_normalize_pdf_text(token_text))
-        line_tokens.append((token_text, is_bold))
-        line_width += token_width
-
-    if line_tokens:
-        _write_tokens_line(pdf, line_tokens, size=size, line_height=line_height)
-
-
-def _write_tokens_line(
-    pdf: FPDF,
-    tokens: list[tuple[str, bool]],
-    *,
-    size: int,
-    line_height: int,
-) -> None:
-    pdf.set_x(pdf.l_margin)
-    for token_text, is_bold in tokens:
-        pdf.set_font("Helvetica", style="B" if is_bold else "", size=size)
-        pdf.write(line_height, _normalize_pdf_text(token_text))
-    pdf.ln(line_height)

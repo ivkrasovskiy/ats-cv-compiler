@@ -4,13 +4,13 @@ LLM helpers for generating an experience summary paragraph.
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import yaml
 
+from cv_compiler.llm._json_response import make_json_schema, parse_json_field
 from cv_compiler.schema.models import JobSpec, ProjectEntry
 
 
@@ -57,30 +57,8 @@ def build_experience_summary_prompt(
 
 
 def parse_experience_summary(text: str) -> str:
-    try:
-        data = json.loads(text)
-    except json.JSONDecodeError as exc:
-        raise ValueError("Experience summary must be valid JSON") from exc
-    if not isinstance(data, dict):
-        raise ValueError("Experience summary response must be a JSON object")
-    value = data.get("summary")
-    if not isinstance(value, str) or not value.strip():
-        raise ValueError("Experience summary must include a non-empty summary field")
-    return value.strip()
+    return parse_json_field(text, field="summary", label="Experience summary")
 
 
 def experience_summary_schema() -> dict[str, object]:
-    return {
-        "type": "json_schema",
-        "json_schema": {
-            "name": "experience_summary_response",
-            "schema": {
-                "type": "object",
-                "additionalProperties": False,
-                "required": ["summary"],
-                "properties": {
-                    "summary": {"type": "string"},
-                },
-            },
-        },
-    }
+    return make_json_schema("experience_summary_response", "summary")
