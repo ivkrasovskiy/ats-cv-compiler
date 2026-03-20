@@ -118,7 +118,7 @@ def render_markdown_to_pdf(markdown: str, output_path: Path) -> None:
         pdf.ln(5)
 
     seen_name = False
-    seen_contact = False
+    _header_lines = 0  # counts lines consumed after # Name (0=headline, 1=contacts)
     for raw_line in markdown.splitlines():
         line = raw_line.strip()
         if not line:
@@ -134,7 +134,7 @@ def render_markdown_to_pdf(markdown: str, output_path: Path) -> None:
             pdf.set_x(pdf.l_margin)
             pdf.cell(0, 8, title, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
             seen_name = True
-            seen_contact = False
+            _header_lines = 0
             continue
 
         if line == "---":
@@ -155,9 +155,16 @@ def render_markdown_to_pdf(markdown: str, output_path: Path) -> None:
             bullet(line[2:].strip())
             continue
 
-        if seen_name and not seen_contact:
-            contact_line(line)
-            seen_contact = True
+        if seen_name and _header_lines < 2:
+            if _header_lines == 0:
+                # Headline + location line — plain text, size 11
+                pdf.set_font("Helvetica", size=11)
+                pdf.set_x(pdf.l_margin)
+                pdf.cell(0, 6, _normalize_pdf_text(line), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            else:
+                # Contacts line — email + links, size 10
+                contact_line(line)
+            _header_lines += 1
             continue
 
         paragraph(line, size=10)
