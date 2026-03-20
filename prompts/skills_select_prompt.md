@@ -4,8 +4,11 @@ STRICT RULES (NON-NEGOTIABLE):
 - Do NOT invent skills or tools.
 - Choose ONLY from the provided SKILLS list.
 - Each skill entry includes exact_matches (confirmed keyword hit) and fuzzy_matches (likely alias/synonym).
-- Include a skill if it is genuinely relevant to the role, even if both scores are 0 (foundational skills the job assumes).
-- Exclude skills that are clearly unrelated to the job.
+- Be selective: choose the most relevant skills for this specific role. A CV skills section should be concise.
+- Prefer skills with exact_matches > 0, then fuzzy_matches > 0, then only include zero-score skills if they are core/foundational for this role.
+- Aim for at most 5 skills per implied category (e.g. 5 ML skills, 5 framework skills, 5 infra skills).
+- Total selected skills should be between 10 and 25. Do NOT include everything.
+- Exclude skills that are clearly unrelated or tangential to the job.
 - Output JSON only. No extra commentary.
 
 OUTPUT FORMAT (JSON ONLY):
