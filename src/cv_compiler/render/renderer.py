@@ -157,14 +157,21 @@ def render_markdown_to_pdf(markdown: str, output_path: Path) -> None:
 
         if seen_name and _header_lines < 2:
             if _header_lines == 0:
-                # Headline + location line — plain text, size 11
-                pdf.set_font("Helvetica", size=11)
-                pdf.set_x(pdf.l_margin)
-                pdf.cell(0, 6, _normalize_pdf_text(line), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                if _MD_LINK_RE.search(line):
+                    # OLD format: single line containing both headline and links.
+                    # Render the whole thing as a contacts line so links display correctly.
+                    contact_line(line)
+                    _header_lines = 2  # skip waiting for a second line
+                else:
+                    # NEW format: headline + location only, plain text, size 11
+                    pdf.set_font("Helvetica", size=11)
+                    pdf.set_x(pdf.l_margin)
+                    pdf.cell(0, 6, _normalize_pdf_text(line), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                    _header_lines = 1
             else:
-                # Contacts line — email + links, size 10
+                # NEW format second line: contacts (email + links), size 10
                 contact_line(line)
-            _header_lines += 1
+                _header_lines = 2
             continue
 
         paragraph(line, size=10)

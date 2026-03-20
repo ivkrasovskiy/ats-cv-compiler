@@ -323,9 +323,13 @@ export function OutputPage() {
     } catch { /* ignore */ }
   }
 
-  // Derive the job path from the CV base name, e.g. cv_job_google → jobs/google.md
+  // Derive the job path from the CV base name.
+  // cv_job_google → jobs/google.md
+  // cv_google     → jobs/google.md  (fallback for non-standard naming)
+  // cv_generic    → null (generic build)
   const jobPathForBase = (base: string): string | null => {
     if (base.startsWith('cv_job_')) return `jobs/${base.replace(/^cv_job_/, '')}.md`
+    if (base !== 'cv_generic' && base.startsWith('cv_')) return `jobs/${base.replace(/^cv_/, '')}.md`
     return null
   }
 
