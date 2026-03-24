@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run python scripts/gen_code_metadata.py --quiet 2>&1 | grep -E '\\[⚠\\]|\\[✓\\]' || true"
+          }
+        ]
+      }
+    ]
+  }
+}
