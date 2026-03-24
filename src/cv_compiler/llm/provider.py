@@ -38,7 +38,7 @@ def resolve_from_env(env_path: Path = Path("config/llm.env")) -> ResolvedProvide
                 args=("-p",),
                 model=None,
                 timeout_seconds=300,
-                prompt_mode="stdin",
+                prompt_mode="arg",
                 progress=False,
             ),
         )

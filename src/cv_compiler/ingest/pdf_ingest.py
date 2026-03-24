@@ -387,11 +387,16 @@ def _request_llm_content(config: LLMConfig, prompt: str) -> str:
 
 
 def _cli_llm_content(config: CodexExecConfig, prompt: str) -> str:
-    cmd = [config.command, *config.args]
+    if config.prompt_mode == "arg":
+        cmd = [config.command, *config.args, prompt]
+        stdin_data = None
+    else:
+        cmd = [config.command, *config.args]
+        stdin_data = prompt.encode("utf-8")
     try:
         result = subprocess.run(
             cmd,
-            input=prompt.encode("utf-8"),
+            input=stdin_data,
             capture_output=True,
             timeout=config.timeout_seconds,
             check=False,

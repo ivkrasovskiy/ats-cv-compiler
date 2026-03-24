@@ -1,4 +1,4 @@
-.PHONY: start dev install test test-onboard test-onboard-claude test-onboard-gemini test-onboard-setup lint fmt check
+.PHONY: start dev install update test test-onboard test-onboard-claude test-onboard-gemini test-onboard-setup lint fmt check
 
 # ── Local web app (backend + frontend) ────────────────────────────────────────
 install:  ## Install Python deps (--extra app) and frontend npm packages
@@ -7,6 +7,35 @@ install:  ## Install Python deps (--extra app) and frontend npm packages
 
 start:  ## Launch web app. Equivalent to bash start.sh
 	@bash start.sh
+
+update:  ## Pull latest changes from origin/main (safe: never touches data/, jobs/, config/)
+	@echo "[i] Fetching latest changes..."
+	@git fetch origin
+	@BEHIND=$$(git rev-list HEAD..origin/main --count 2>/dev/null || echo 0); \
+	 if [ "$$BEHIND" = "0" ]; then \
+	   echo "[✓] Already up to date."; \
+	   exit 0; \
+	 fi; \
+	 echo "[i] $$BEHIND new commit(s) available."; \
+	 if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then \
+	   echo "[!] You have uncommitted local changes to tracked files."; \
+	   echo "    Stash them first:  git stash && make update && git stash pop"; \
+	   exit 1; \
+	 fi; \
+	 if git pull --ff-only origin main; then \
+	   echo "[✓] Code updated. Re-installing dependencies..."; \
+	   uv sync --extra app; \
+	   npm install --prefix app/frontend --silent; \
+	   echo "[✓] Done. Restart the app: bash start.sh"; \
+	 else \
+	   echo ""; \
+	   echo "[!] Cannot auto-update: your local branch has diverged from origin/main."; \
+	   echo "    Options:"; \
+	   echo "      1. git rebase origin/main   (keeps your local commits on top)"; \
+	   echo "      2. Download the repo fresh: https://github.com/ivkrasovskiy/ats-cv-compiler"; \
+	   echo "    Your data/ jobs/ config/ are safe — git never touches gitignored files."; \
+	   exit 1; \
+	 fi
 
 dev: install  ## Start backend :8000 + frontend dev server :5173  →  open http://localhost:5173
 	@echo "Backend → http://localhost:8000  |  Frontend → http://localhost:5173"
