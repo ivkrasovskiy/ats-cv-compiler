@@ -55,7 +55,8 @@ export function useAgentTerminal(): UseAgentTerminalResult {
 
     const terminal = terminalRef.current
 
-    const wsUrl = `ws://localhost:8000/ws/agent?cli=${encodeURIComponent(cli)}`
+    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    const wsUrl = `${proto}//${window.location.host}/ws/agent?cli=${encodeURIComponent(cli)}`
     const ws = new WebSocket(wsUrl)
     ws.binaryType = 'arraybuffer'
     wsRef.current = ws
