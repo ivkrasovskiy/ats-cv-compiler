@@ -54,6 +54,7 @@ After each step, confirm the user is ready before moving on.
 | `uv run cv lint` | Validate data files |
 | `uv run cv build --example basic` | Try the bundled example (safe to run) |
 | `uv run --extra app cv-app` | Start the local web GUI → http://localhost:8000 |
+| (browser) `/agent` | Open Agent Terminal — talk to claude/gemini from the browser |
 
 ---
 
@@ -111,7 +112,8 @@ out/                ← generated CVs (do not edit)
 templates/          ← PDF layout templates
 prompts/            ← AI instructions for bullet rewriting
 examples/basic/     ← safe working example (read-only reference)
-config/llm.env      ← LLM settings (optional)
+config/llm.env      ← LLM settings + CV_REPAIR_MODE (silent|approval|inform)
+logs/               ← backend/frontend error logs (gitignored, auto-created)
 src/cv_compiler/    ← Python source
 onboard.sh          ← bootstrap script for new users
 GEMINI.md           ← project guide for Gemini CLI users

@@ -9,6 +9,7 @@ CONFIG_GROUPS = {
         "CV_AGENT_MAX_BULLET_CHARS",
         "CV_AGENT_MAX_SUMMARY_CHARS",
         "CV_AGENT_KEYWORD_COVERAGE_MIN",
+        "CV_REPAIR_MODE",
     ],
     "advanced_llm": [
         "CV_LLM_BASE_URL",

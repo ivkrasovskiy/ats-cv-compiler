@@ -316,12 +316,14 @@ export function OutputPage() {
   }
 
   // Re-render the edited markdown file directly to PDF (no AI, no pipeline re-run)
+  // Also used as handleGeneratePdf for save-and-regen flows.
   const handleRerenderMd = async (mdName: string) => {
     try {
       const { job_id } = await buildFromMd(`out/${mdName}`)
       await runBuild(mdName, job_id)
     } catch { /* ignore */ }
   }
+  const handleGeneratePdf = handleRerenderMd
 
   // Derive the job path from the CV base name.
   // cv_job_google → jobs/google.md

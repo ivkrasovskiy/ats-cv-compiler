@@ -207,6 +207,7 @@ data/*
 
 # Temporary working artifacts
 tmp/
+logs/
 jobs/*
 !jobs/README.md
 .DS_Store

@@ -19,6 +19,12 @@ const BASIC_LABELS: Record<string, { label: string; tip: string; type: 'text' | 
   CV_AGENT_KEYWORD_COVERAGE_MIN: { label: 'Keyword Coverage', tip: 'Minimum fraction of job keywords that must appear in the CV (0–1, default: 0.5).', type: 'number' },
 }
 
+const REPAIR_MODE_OPTIONS = [
+  { value: 'silent', label: 'Silent (auto-fix)', desc: 'Auto-repair errors, restart in background' },
+  { value: 'approval', label: 'Approval', desc: 'Show fix proposal, require confirmation' },
+  { value: 'inform', label: 'Inform only', desc: 'Show traceback toast, no auto-fix' },
+] as const
+
 const ADV_LLM_LABELS: Record<string, { label: string; tip: string }> = {
   CV_LLM_BASE_URL: { label: 'Base URL', tip: 'OpenAI-compatible API base URL.' },
   CV_LLM_API_KEY: { label: 'API Key', tip: 'Your LLM provider API key.' },
@@ -236,6 +242,30 @@ export function BuildPage() {
                 onChange={val => setBasic(key, val)}
               />
             ))}
+            {/* Repair Mode */}
+            <div className="py-3">
+              <Tooltip text="How the app responds when a backend error is detected.">
+                <label className="text-sm text-slate-300">Auto-Repair Mode</label>
+              </Tooltip>
+              <div className="mt-2 space-y-2">
+                {REPAIR_MODE_OPTIONS.map(opt => (
+                  <label key={opt.value} className="flex cursor-pointer items-start gap-2">
+                    <input
+                      type="radio"
+                      name="repair-mode"
+                      value={opt.value}
+                      checked={(localConfig.basic['CV_REPAIR_MODE'] ?? 'silent') === opt.value}
+                      onChange={() => setBasic('CV_REPAIR_MODE', opt.value)}
+                      className="mt-0.5 accent-indigo-500"
+                    />
+                    <span className="text-sm text-slate-300">
+                      <strong>{opt.label}</strong>
+                      <span className="ml-2 text-slate-500">— {opt.desc}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
           </div>
         )}
         <div className="mt-4 flex items-center gap-3">

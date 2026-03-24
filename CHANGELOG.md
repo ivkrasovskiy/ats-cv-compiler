@@ -5,6 +5,38 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [1.1.0] — 2026-03-24
+
+### Added
+
+- **Agent Terminal (`/agent`)** — xterm.js embedded terminal in the browser; connects over
+  WebSocket to a PTY bridge that spawns `claude` or `gemini` interactively. Full ANSI color,
+  resize support, and provider selection.
+
+- **Self-Repair system** — background service polls `logs/backend.log` for 4xx/5xx errors,
+  classifies them with the configured CLI (`-p` mode), and reacts based on `CV_REPAIR_MODE`:
+  - `silent` (default): auto-applies fix via CLI + `git stash` safety net; backend reloads; frontend polls `/api/health` and reloads.
+  - `approval`: shows fix proposal toast with Approve/Dismiss buttons.
+  - `inform`: shows traceback toast with "Fix with AI →" link to Agent Terminal.
+
+- **Error logging middleware** — `ErrorLoggingMiddleware` captures all 4xx/5xx responses and
+  exceptions to `logs/backend.log` (JSON lines, rotating 5 MB × 3 files).
+
+- **Frontend error boundary** — catches React render errors, POSTs to `/api/client-errors`,
+  shows a friendly "Reload page" UI.
+
+- **`/api/repair/*` endpoints** — SSE stream, status, apply, dismiss, GitHub issue creation.
+
+- **`/api/client-errors`** — receives frontend JS errors, logs to `logs/frontend.log`.
+
+- **`CV_REPAIR_MODE` config key** — selectable in Gen Config → Auto-Repair Mode radio group.
+  Default: `silent`. Existing installs without the key default to `silent`.
+
+- **GitHub issue creation** — "Create GitHub Issue" button in repair toast (shown when `gh`
+  CLI is on PATH).
+
+---
+
 ## [1.0.0] — 2026-03-24
 
 ### Added
