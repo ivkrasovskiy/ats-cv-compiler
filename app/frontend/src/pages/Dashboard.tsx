@@ -94,6 +94,13 @@ export function Dashboard() {
   const lint = useQuery({ queryKey: ['lint'], queryFn: getLint })
   const jobsQ = useQuery({ queryKey: ['files', 'jobs'], queryFn: listJobFiles })
   const configQ = useQuery({ queryKey: ['config'], queryFn: getConfig })
+  const authQ = useQuery({
+    queryKey: ['agent-auth-status'],
+    queryFn: (): Promise<{ provider: string; logged_in: boolean }> =>
+      fetch('/api/agent/auth-status').then(r => r.json()),
+    staleTime: 30_000,
+    retry: false,
+  })
 
   const genericBuild = useInlineBuild()
   const jobBuild = useInlineBuild()
@@ -165,27 +172,52 @@ export function Dashboard() {
           </h2>
           <ol className="space-y-2">
             <li className="flex items-start gap-3">
-              <span className="shrink-0 flex h-6 w-6 items-center justify-center rounded-full bg-indigo-700 text-xs font-bold text-white">1</span>
+              {authQ.data?.logged_in ? (
+                <span className="shrink-0 flex h-6 w-6 items-center justify-center rounded-full bg-green-700 text-xs font-bold text-white">✓</span>
+              ) : (
+                <span className="shrink-0 flex h-6 w-6 items-center justify-center rounded-full bg-yellow-600 text-xs font-bold text-white">1</span>
+              )}
+              <span className="text-sm text-slate-300">
+                {authQ.data?.logged_in ? (
+                  <span className="text-green-400">
+                    Logged in to {authQ.data.provider === 'claude' ? 'Claude CLI' : 'Gemini CLI'} ✓
+                  </span>
+                ) : (
+                  <>
+                    <strong className="text-yellow-300">Log in to your AI assistant first</strong>
+                    {' — '}go to the{' '}
+                    <Link to="/agent" className="underline text-indigo-400">Agent tab</Link>,
+                    click <strong>Start</strong>, and complete the login prompt
+                    {authQ.data?.provider === 'claude'
+                      ? ' (Anthropic account)'
+                      : ' (Google account for Gemini)'}.
+                    {' '}AI features won't work until this is done.
+                  </>
+                )}
+              </span>
+            </li>
+            <li className="flex items-start gap-3">
+              <span className="shrink-0 flex h-6 w-6 items-center justify-center rounded-full bg-indigo-700 text-xs font-bold text-white">2</span>
               <span className="text-sm text-slate-300">
                 Upload your existing CV (PDF) — use the <strong>Upload my CV</strong> card below
               </span>
             </li>
             <li className="flex items-start gap-3">
-              <span className="shrink-0 flex h-6 w-6 items-center justify-center rounded-full bg-indigo-700 text-xs font-bold text-white">2</span>
+              <span className="shrink-0 flex h-6 w-6 items-center justify-center rounded-full bg-indigo-700 text-xs font-bold text-white">3</span>
               <span className="text-sm text-slate-300">
                 Review &amp; edit your Profile —{' '}
                 <Link to="/data" className="underline text-indigo-400">go to Profile tab</Link>
               </span>
             </li>
             <li className="flex items-start gap-3">
-              <span className="shrink-0 flex h-6 w-6 items-center justify-center rounded-full bg-indigo-700 text-xs font-bold text-white">3</span>
+              <span className="shrink-0 flex h-6 w-6 items-center justify-center rounded-full bg-indigo-700 text-xs font-bold text-white">4</span>
               <span className="text-sm text-slate-300">
                 Add target job descriptions —{' '}
                 <Link to="/jobs" className="underline text-indigo-400">go to Target Jobs tab</Link>
               </span>
             </li>
             <li className="flex items-start gap-3">
-              <span className="shrink-0 flex h-6 w-6 items-center justify-center rounded-full bg-indigo-700 text-xs font-bold text-white">4</span>
+              <span className="shrink-0 flex h-6 w-6 items-center justify-center rounded-full bg-indigo-700 text-xs font-bold text-white">5</span>
               <span className="text-sm text-slate-300">
                 Generate your CVs — use <strong>Build for Job</strong> or <strong>Build Generic CV</strong> cards below
               </span>
@@ -326,6 +358,28 @@ export function Dashboard() {
               </p>
             )}
             <InlineLog lines={genericBuild.state.lines} status={genericBuild.state.status} />
+          </div>
+
+          {/* Agent Terminal */}
+          <div className="rounded-xl border border-slate-700 bg-slate-900 p-5">
+            <div className="mb-2 text-2xl">🤖</div>
+            <Tooltip text="Open a live terminal connected to Claude or Gemini. Ask questions, edit CV data, debug build errors — all from the browser.">
+              <h3 className="font-semibold text-slate-100">Agent Terminal</h3>
+            </Tooltip>
+            <p className="mt-1 text-xs text-slate-400">
+              Talk to Claude or Gemini directly from the browser
+            </p>
+            <ul className="mt-2 space-y-0.5 text-xs text-slate-500">
+              <li>· Edit profile, skills, or experience by chatting</li>
+              <li>· Debug a failed build or lint error</li>
+              <li>· Ask the AI to tailor your CV for a job</li>
+            </ul>
+            <button
+              onClick={() => navigate('/agent')}
+              className="mt-3 rounded-lg bg-slate-700 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-slate-600"
+            >
+              Open Agent →
+            </button>
           </div>
 
           {/* Build for Job */}

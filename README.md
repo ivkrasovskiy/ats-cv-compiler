@@ -6,15 +6,16 @@
 |-----------|---------------|-------------|
 | ![Dashboard](docs/screenshots/dashboard.png) | ![Profile](docs/screenshots/profile.png) | ![Jobs](docs/screenshots/jobs.png) |
 
-| Generated CVs | Gen Config |
-|--------------|-----------|
-| ![Output](docs/screenshots/output.png) | ![Config](docs/screenshots/config.png) |
+| Generated CVs | Gen Config | Agent Terminal |
+|--------------|-----------|---------------|
+| ![Output](docs/screenshots/output.png) | ![Config](docs/screenshots/config.png) | ![Agent](docs/screenshots/agent.png) |
 
 **Dashboard** — upload your CV PDF, parse it with AI, build generic or job-targeted CVs.
 **Profile** — review and edit all extracted data: profile, skills, education, projects.
 **Target Jobs** — paste job descriptions to get a tailored CV for each role.
 **Generated CVs** — preview and download your built PDFs.
 **Gen Config** — configure the AI provider (Gemini, Claude, or custom endpoint).
+**Agent Terminal** — talk to Claude or Gemini directly from the browser; edit CV data, debug issues, ask questions.
 
 ---
 

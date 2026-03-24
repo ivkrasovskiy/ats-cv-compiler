@@ -1,4 +1,4 @@
-.PHONY: start dev install update test test-onboard test-onboard-claude test-onboard-gemini test-onboard-setup lint fmt check
+.PHONY: start dev install update test test-onboard test-onboard-claude test-onboard-gemini test-onboard-setup lint fmt check metadata layout
 
 # ── Local web app (backend + frontend) ────────────────────────────────────────
 install:  ## Install Python deps (--extra app) and frontend npm packages
@@ -41,13 +41,21 @@ dev: install  ## Start backend :8000 + frontend dev server :5173  →  open http
 	@echo "Backend → http://localhost:8000  |  Frontend → http://localhost:5173"
 	@echo "Press Ctrl-C to stop both."
 	@uv run --extra app cv-app & BACK=$$!; \
-	 trap "kill $$BACK 2>/dev/null; wait $$BACK 2>/dev/null" EXIT INT TERM; \
-	 cd app/frontend && npm run dev; \
+	 PGID=$$(ps -o pgid= -p $$BACK 2>/dev/null | tr -d ' \n' || echo $$BACK); \
+	 trap "kill -- -$$PGID 2>/dev/null; wait $$BACK 2>/dev/null" EXIT INT TERM; \
+	 npm --prefix app/frontend run dev; \
 	 wait
 
 # ── Unit tests ─────────────────────────────────────────────────────────────────
 test:
 	uv run pytest tests/ -q
+
+# ── Code metadata + project layout ───────────────────────────────────────────
+metadata:  ## Regenerate docs/code_metadata.md (lines, complexity, import graph)
+	uv run python scripts/gen_code_metadata.py
+
+layout:  ## Regenerate project_layout.md from the real filesystem tree
+	uv run python scripts/gen_project_layout.py
 
 # ── Lint + format check ────────────────────────────────────────────────────────
 lint:

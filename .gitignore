@@ -207,9 +207,15 @@ data/*
 
 # Temporary working artifacts
 tmp/
+logs/
 jobs/*
 !jobs/README.md
 .DS_Store
+
+# Playwright E2E test artifacts
+app/e2e/test-results/
+app/e2e/playwright-report/
+app/e2e/docs/
 
 # Local LLM config
 config/llm.env

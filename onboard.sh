@@ -398,13 +398,31 @@ if [ "${CV_ONBOARD_TEST:-}" = "1" ]; then
     exit 0
 fi
 
+# ── Step 9 — Log in to the AI assistant ──────────────────────────────────────
+# The CLI must be authenticated before the web app can parse CVs or run builds.
+printf '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'
+printf ' LAST STEP  —  LOG IN TO %s\n' "$(printf '%s' "$ASSISTANT" | tr '[:lower:]' '[:upper:]')"
+printf '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'
+printf '\n'
+printf '  The web app calls %s whenever you parse a CV or run an\n' "$ASSISTANT"
+printf '  AI-assisted build. You need to be logged in for that to work.\n'
+printf '\n'
+printf '  We will open %s now so you can complete the login.\n' "$ASSISTANT"
+printf '  Once you see the prompt, you can close it and start the app.\n'
+printf '\n'
+printf 'Press Enter to open %s and log in...' "$ASSISTANT"
+read -r _ENTER
+"$ASSISTANT"
+
+printf '\n'
+printf '[✓] %s session closed.\n' "$ASSISTANT"
+printf '\n'
 printf 'Launch the web app now? [Y/n]: '
 read -r _LAUNCH
 case "$_LAUNCH" in
-    [Nn]*) ;;
+    [Nn]*)
+        printf '\n  To start later:  bash start.sh\n'
+        printf '  Then open:       http://localhost:5173\n\n'
+        ;;
     *) exec sh start.sh ;;
 esac
-
-printf 'Press Enter to open %s...' "$ASSISTANT"
-read -r _ENTER
-exec "$ASSISTANT"

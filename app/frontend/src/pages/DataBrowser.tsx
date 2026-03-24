@@ -11,28 +11,13 @@ import { SkillsForm } from '../components/form/SkillsForm'
 import { EducationForm } from '../components/form/EducationForm'
 import { ExperienceForm } from '../components/form/ExperienceForm'
 import { ProjectForm } from '../components/form/ProjectForm'
+import { Section, GroupedSection } from '../components/DataBrowserSidebar'
+import { inferFileType, defaultMode } from '../utils/dataBrowserUtils'
 
 const PROFILE_FILES = ['profile.md', 'skills.md', 'education.md', 'experience_summary.md']
-
 const FORM_SUPPORTED_TYPES = new Set(['profile', 'skills', 'education', 'experience', 'project'])
 
 type EditMode = 'form' | 'blocks' | 'raw'
-
-function inferFileType(path: string): string | null {
-  if (path === 'profile.md') return 'profile'
-  if (path === 'skills.md') return 'skills'
-  if (path === 'education.md') return 'education'
-  if (path.startsWith('experience/') && path.endsWith('.md')) return 'experience'
-  if (path.startsWith('projects/') && path.endsWith('.md')) return 'project'
-  return null
-}
-
-function defaultMode(path: string): EditMode {
-  const ft = inferFileType(path)
-  if (ft !== null && FORM_SUPPORTED_TYPES.has(ft)) return 'form'
-  if (path.endsWith('.md')) return 'blocks'
-  return 'raw'
-}
 
 function FormView({ path, fileType, onSaved }: { path: string; fileType: string; onSaved: () => void }) {
   switch (fileType) {
@@ -43,198 +28,6 @@ function FormView({ path, fileType, onSaved }: { path: string; fileType: string;
     case 'project': return <ProjectForm path={path} onSaved={onSaved} />
     default: return null
   }
-}
-
-function stripPrefix(name: string): string {
-  return name
-    .replace(/^llm_exp_/, '')
-    .replace(/^user_exp_/, '')
-    .replace(/^proj_/, '')
-    .replace(/\.md$/, '')
-}
-
-function groupByCompany(files: FileItem[]): { company: string; files: FileItem[] }[] {
-  const map = new Map<string, FileItem[]>()
-  for (const f of files) {
-    const key = f.company ?? ''
-    if (!map.has(key)) map.set(key, [])
-    map.get(key)!.push(f)
-  }
-  return [...map.entries()]
-    .sort(([a], [b]) => {
-      if (a === '' && b !== '') return 1
-      if (a !== '' && b === '') return -1
-      return a.localeCompare(b)
-    })
-    .map(([company, files]) => ({ company, files }))
-}
-
-function FileList({
-  files,
-  selected,
-  onSelect,
-  onDelete,
-  canDelete,
-}: {
-  files: FileItem[]
-  selected: string | null
-  onSelect: (path: string) => void
-  onDelete?: (path: string) => void
-  canDelete?: boolean
-}) {
-  return (
-    <ul className="py-1">
-      {files.map(f => (
-        <li
-          key={f.path}
-          className={`group/item flex items-center gap-1 px-3 py-1.5 text-sm ${
-            selected === f.path ? 'bg-indigo-900/40 text-indigo-300' : 'text-slate-300 hover:bg-slate-800'
-          }`}
-        >
-          <button
-            className="flex-1 truncate text-left"
-            onClick={() => onSelect(f.path)}
-            title={f.name}
-          >
-            {stripPrefix(f.name)}
-          </button>
-          {canDelete && onDelete && (
-            <button
-              onClick={() => onDelete(f.path)}
-              className="shrink-0 rounded px-1 text-xs text-slate-500 opacity-0 hover:text-red-400 group-hover/item:opacity-100"
-            >
-              ×
-            </button>
-          )}
-        </li>
-      ))}
-      {files.length === 0 && <li className="px-3 py-1 text-xs text-slate-600">No files</li>}
-    </ul>
-  )
-}
-
-function Section({
-  title,
-  files,
-  selected,
-  onSelect,
-  onDelete,
-  onAdd,
-  canDelete,
-  defaultOpen = true,
-  tip,
-}: {
-  title: string
-  files: FileItem[]
-  selected: string | null
-  onSelect: (path: string) => void
-  onDelete?: (path: string) => void
-  onAdd?: () => void
-  canDelete?: boolean
-  defaultOpen?: boolean
-  tip?: string
-}) {
-  return (
-    <details open={defaultOpen} className="group">
-      <summary className="flex cursor-pointer items-center justify-between px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-400 hover:text-slate-300 select-none">
-        <span className="flex items-center gap-1">
-          <span className="mr-1 text-slate-500 group-open:hidden">▶</span>
-          <span className="mr-1 text-slate-500 hidden group-open:inline">▼</span>
-          <span>{title}</span>
-          {tip && (
-            <span
-              className="ml-1 cursor-help text-slate-600 hover:text-slate-400"
-              title={tip}
-              onClick={e => e.preventDefault()}
-            >
-              ℹ
-            </span>
-          )}
-        </span>
-        {onAdd && (
-          <button
-            onClick={e => { e.preventDefault(); onAdd() }}
-            className="rounded bg-slate-700 px-2 py-0.5 text-xs font-medium text-slate-300 hover:bg-slate-600"
-          >
-            + Add
-          </button>
-        )}
-      </summary>
-      <FileList files={files} selected={selected} onSelect={onSelect} onDelete={onDelete} canDelete={canDelete} />
-    </details>
-  )
-}
-
-function GroupedSection({
-  title,
-  files,
-  selected,
-  onSelect,
-  onDelete,
-  onAdd,
-  canDelete,
-  tip,
-}: {
-  title: string
-  files: FileItem[]
-  selected: string | null
-  onSelect: (path: string) => void
-  onDelete?: (path: string) => void
-  onAdd?: () => void
-  canDelete?: boolean
-  tip?: string
-}) {
-  const groups = groupByCompany(files)
-  const hasCompanies = groups.some(g => g.company !== '')
-
-  return (
-    <details open className="group">
-      <summary className="flex cursor-pointer items-center justify-between px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-400 hover:text-slate-300 select-none">
-        <span className="flex items-center gap-1">
-          <span className="mr-1 text-slate-500 group-open:hidden">▶</span>
-          <span className="mr-1 text-slate-500 hidden group-open:inline">▼</span>
-          <span>{title}</span>
-          {tip && (
-            <span
-              className="ml-1 cursor-help text-slate-600 hover:text-slate-400"
-              title={tip}
-              onClick={e => e.preventDefault()}
-            >
-              ℹ
-            </span>
-          )}
-        </span>
-        {onAdd && (
-          <button
-            onClick={e => { e.preventDefault(); onAdd() }}
-            className="rounded bg-slate-700 px-2 py-0.5 text-xs font-medium text-slate-300 hover:bg-slate-600"
-          >
-            + Add
-          </button>
-        )}
-      </summary>
-      {hasCompanies ? (
-        groups.map(({ company, files: groupFiles }) => (
-          <div key={company || '__none__'}>
-            {company && (
-              <div className="px-3 pt-2 pb-0.5 text-xs font-medium text-slate-500 uppercase tracking-wide border-t border-slate-800 mt-1">
-                {company}
-              </div>
-            )}
-            <FileList
-              files={groupFiles}
-              selected={selected}
-              onSelect={onSelect}
-              onDelete={onDelete}
-              canDelete={canDelete}
-            />
-          </div>
-        ))
-      ) : (
-        <FileList files={files} selected={selected} onSelect={onSelect} onDelete={onDelete} canDelete={canDelete} />
-      )}
-    </details>
-  )
 }
 
 export function DataBrowser() {
@@ -300,7 +93,6 @@ export function DataBrowser() {
   }
 
   const files = treeQ.data ?? []
-
   const profileFiles = files.filter(f => PROFILE_FILES.includes(f.path))
   const experienceFiles = files.filter(f => f.path.startsWith('experience/'))
   const projectFiles = files.filter(f => f.path.startsWith('projects/'))
@@ -349,7 +141,6 @@ export function DataBrowser() {
     <div className="flex h-[calc(100vh-8rem)] gap-0 overflow-hidden rounded-xl border border-slate-700">
       {/* Left panel */}
       <div className="w-60 shrink-0 overflow-y-auto border-r border-slate-700 bg-slate-900">
-        {/* Sticky header + banner */}
         <div className="sticky top-0 z-10 bg-slate-900">
           <div className="border-b border-slate-700 px-3 py-2 text-xs font-medium uppercase tracking-wide text-slate-400">
             Profile Data
@@ -369,7 +160,6 @@ export function DataBrowser() {
 
         {treeQ.isLoading && <p className="px-3 py-2 text-xs text-slate-500">Loading…</p>}
 
-        {/* Add new file inline form */}
         {addingIn && (
           <div className="border-b border-slate-700 px-3 py-2 space-y-2">
             <p className="text-xs text-slate-400">New file in {addingIn}/</p>
@@ -451,7 +241,6 @@ export function DataBrowser() {
         )}
         {selected && (editMode === 'form' ? isFormSupported : fileQ.data !== undefined) && (
           <div className="flex h-full flex-col overflow-hidden">
-            {/* Top bar: filename + mode toggle */}
             <div className="flex items-center justify-between border-b border-slate-700 px-4 py-2 shrink-0">
               <span className="font-mono text-sm text-slate-400">{selected}</span>
               <div className="flex gap-1">
@@ -495,7 +284,6 @@ export function DataBrowser() {
               </div>
             </div>
 
-            {/* Skills contextual tip */}
             {selected === 'skills.md' && (
               <div className="border-b border-yellow-800 bg-yellow-950/30 px-4 py-2 text-xs text-yellow-300 shrink-0">
                 Add as many skills as possible — the system picks the most relevant ones per target job. Aim for 20+ skills.
@@ -539,7 +327,6 @@ export function DataBrowser() {
         )}
       </div>
 
-      {/* Confirm delete dialog */}
       {deleteTarget && (
         <ConfirmDialog
           title="Delete file?"
@@ -550,7 +337,6 @@ export function DataBrowser() {
         />
       )}
 
-      {/* Confirm discard changes */}
       {confirmDiscard && (
         <ConfirmDialog
           title="Discard changes?"
