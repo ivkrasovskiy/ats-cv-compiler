@@ -31,7 +31,7 @@ export function useAgentTerminal(): UseAgentTerminalResult {
     if (!termRef.current) return
     setStatus('connecting')
 
-    // Create terminal if not exists
+    // Create terminal if not exists, otherwise reset for new session
     if (!terminalRef.current) {
       const terminal = new Terminal({
         theme: {
@@ -51,6 +51,9 @@ export function useAgentTerminal(): UseAgentTerminalResult {
       fitAddon.fit()
       terminalRef.current = terminal
       fitAddonRef.current = fitAddon
+    } else {
+      terminalRef.current.reset()
+      fitAddonRef.current?.fit()
     }
 
     const terminal = terminalRef.current

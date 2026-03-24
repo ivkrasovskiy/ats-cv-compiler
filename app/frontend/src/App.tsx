@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { BrowserRouter, NavLink, Route, Routes } from 'react-router-dom'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { BrowserRouter, NavLink, Link, Route, Routes } from 'react-router-dom'
+import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
 import { Dashboard } from './pages/Dashboard'
 import { DataBrowser } from './pages/DataBrowser'
 import { JobsPage } from './pages/JobsPage'
@@ -102,6 +102,50 @@ function Nav() {
   )
 }
 
+const PROVIDER_LABELS: Record<string, string> = {
+  gemini: 'Gemini CLI',
+  claude: 'Claude CLI',
+}
+
+function AgentAuthWarning() {
+  const [dismissed, setDismissed] = useState(false)
+  const { data } = useQuery({
+    queryKey: ['agent-auth-status'],
+    queryFn: (): Promise<{ provider: string; logged_in: boolean }> =>
+      fetch('/api/agent/auth-status').then(r => r.json()),
+    staleTime: 60_000,
+    retry: false,
+  })
+
+  if (dismissed || !data || data.logged_in) return null
+
+  const label = PROVIDER_LABELS[data.provider] ?? data.provider
+
+  return (
+    <div className="border-b border-yellow-900/50 bg-yellow-950/30 px-6 py-2">
+      <div className="mx-auto flex max-w-6xl items-center gap-3">
+        <span className="text-yellow-400 shrink-0">⚠</span>
+        <span className="text-sm text-yellow-300">
+          Not logged in to <strong>{label}</strong>. PDF parsing and AI builds won't work until you log in.
+        </span>
+        <Link
+          to="/agent"
+          className="ml-1 shrink-0 text-sm font-medium text-yellow-400 underline hover:text-yellow-300"
+        >
+          Log in via Agent Terminal →
+        </Link>
+        <button
+          onClick={() => setDismissed(true)}
+          className="ml-auto shrink-0 text-lg leading-none text-yellow-700 hover:text-yellow-400"
+          aria-label="Dismiss"
+        >
+          ×
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function App() {
   return (
     <ErrorBoundary>
@@ -118,6 +162,9 @@ export default function App() {
                 <SystemControls />
               </div>
             </header>
+
+            {/* Auth warning — shown when CLI is not logged in */}
+            <AgentAuthWarning />
 
             {/* Main */}
             <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">

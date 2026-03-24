@@ -5,6 +5,21 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [1.2.0] — 2026-03-24
+
+### Fixed
+
+- **Agent Terminal keyboard input** — typing in the terminal now works correctly, including
+  interactive prompts from Gemini ("Do you trust this folder?") and Claude.
+
+- **Agent Terminal connection** — the terminal now connects properly when the app is accessed
+  via `localhost:5173` (the normal way to open the app with `bash start.sh`).
+
+- **Terminal clears on restart** — stopping and starting the terminal no longer shows output
+  from the previous session.
+
+---
+
 ## [1.1.0] — 2026-03-24
 
 ### Added

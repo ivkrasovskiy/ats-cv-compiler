@@ -13,13 +13,16 @@ router = APIRouter(prefix="/api/repair", tags=["repair"])
 
 
 async def _sse_generator() -> AsyncGenerator[str, None]:
-    queue = repair_service.get_sse_queue()
-    while True:
-        try:
-            event = await asyncio.wait_for(queue.get(), timeout=30)
-            yield f"data: {json.dumps(event)}\n\n"
-        except TimeoutError:
-            yield ": heartbeat\n\n"
+    queue = repair_service.subscribe()
+    try:
+        while True:
+            try:
+                event = await asyncio.wait_for(queue.get(), timeout=30)
+                yield f"data: {json.dumps(event)}\n\n"
+            except TimeoutError:
+                yield ": heartbeat\n\n"
+    finally:
+        repair_service.unsubscribe(queue)
 
 
 @router.get("/stream")
@@ -72,7 +75,7 @@ async def repair_apply():
     )
     event.status = "fix_applied"
     event.fix_output = output
-    await repair_service.get_sse_queue().put(
+    await repair_service._broadcast(
         {"type": "fix_applied", "event": repair_service._event_to_dict(event)}
     )
     return {"ok": True, "output": output}

@@ -25,15 +25,31 @@ class RepairEvent:
     gh_issue_url: str = ""
 
 
-_sse_queue: asyncio.Queue[dict] = asyncio.Queue()
+_subscribers: list[asyncio.Queue[dict]] = []
 _latest_event: RepairEvent | None = None
 _last_check_ts: str | None = None
 
 POLL_INTERVAL = 60  # seconds
 
 
-def get_sse_queue() -> asyncio.Queue[dict]:
-    return _sse_queue
+def subscribe() -> asyncio.Queue[dict]:
+    """Register a new SSE connection; returns a queue that receives live events."""
+    q: asyncio.Queue[dict] = asyncio.Queue()
+    _subscribers.append(q)
+    return q
+
+
+def unsubscribe(q: asyncio.Queue[dict]) -> None:
+    """Remove a disconnected SSE client's queue."""
+    try:
+        _subscribers.remove(q)
+    except ValueError:
+        pass
+
+
+async def _broadcast(event: dict) -> None:
+    for q in list(_subscribers):
+        await q.put(event)
 
 
 def get_latest_event() -> RepairEvent | None:
@@ -153,18 +169,18 @@ async def repair_loop(log_dir: Path, project_root: Path) -> None:
                     fix_hint=fix_hint,
                 )
                 _latest_event = event
-                await _sse_queue.put({"type": "logic_error", "event": _event_to_dict(event)})
+                await _broadcast({"type": "logic_error", "event": _event_to_dict(event)})
 
                 mode = _get_repair_mode()
                 if mode == "silent" and error_type == "logic_error":
                     event.status = "fixing"
-                    await _sse_queue.put({"type": "fixing", "event": _event_to_dict(event)})
+                    await _broadcast({"type": "fixing", "event": _event_to_dict(event)})
                     output = await asyncio.get_event_loop().run_in_executor(
                         None, apply_fix, entry, fix_hint, project_root
                     )
                     event.fix_output = output
                     event.status = "fix_applied"
-                    await _sse_queue.put({"type": "fix_applied", "event": _event_to_dict(event)})
+                    await _broadcast({"type": "fix_applied", "event": _event_to_dict(event)})
         except Exception:
             pass
 

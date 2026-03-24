@@ -32,7 +32,37 @@ export function AgentPage() {
       <div>
         <h1 className="text-2xl font-semibold text-slate-100">Agent Terminal</h1>
         <p className="mt-1 text-sm text-slate-400">
-          Talk to your AI CLI directly from the browser — edit CV data, debug issues, ask questions.
+          A live terminal connected to Claude or Gemini — running inside the browser, with full
+          access to your CV data files.
+        </p>
+      </div>
+
+      {/* What you can do */}
+      <div className="rounded-xl border border-slate-700 bg-slate-900 p-4">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">What you can do</p>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div>
+            <p className="text-xs font-medium text-slate-300">Edit CV data</p>
+            <p className="mt-0.5 text-xs text-slate-500">
+              "Add a Python skill to my skills list" · "Fix the bullet in my last job to be more concise"
+            </p>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-slate-300">Debug builds</p>
+            <p className="mt-0.5 text-xs text-slate-500">
+              "Why is the build failing?" · "Run cv lint and explain the errors"
+            </p>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-slate-300">Tailor for a job</p>
+            <p className="mt-0.5 text-xs text-slate-500">
+              "Create a job file for this posting: …" · "Which of my skills match this job description?"
+            </p>
+          </div>
+        </div>
+        <p className="mt-3 text-xs text-slate-600">
+          Select Claude CLI or Gemini CLI and click <strong className="text-slate-500">Start</strong>.
+          First-time users: the CLI will ask you to log in (Google account for Gemini, Anthropic account for Claude) — complete that before using any AI features in the app.
         </p>
       </div>
 
