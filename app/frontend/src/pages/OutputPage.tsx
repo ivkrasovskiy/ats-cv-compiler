@@ -1,5 +1,4 @@
 import { useState, useMemo, useCallback } from 'react'
-import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -12,128 +11,30 @@ import {
 import type { FileItem } from '../api/client'
 import { FileEditor } from '../components/FileEditor'
 import { CvSectionEditor } from '../components/CvSectionEditor'
-import { ConfirmDialog } from '../components/ConfirmDialog'
 import { PdfViewer } from '../components/PdfViewer'
+import { MdViewPanel } from '../components/MdViewPanel'
+import { OutputFileList } from '../components/OutputFileList'
+import { OutputDialogs } from '../components/OutputDialogs'
 import { useBuildRun } from '../hooks/useBuildRun'
-import { BuildProgress } from '../components/BuildProgress'
+import { groupFiles } from '../utils/outputUtils'
+import type { FilePair } from '../utils/outputUtils'
 
-interface FilePair {
-  base: string
-  md: FileItem | null
-  pdf: FileItem | null
-  coverLetter: FileItem | null
-}
-
-function groupFiles(files: FileItem[]): { pairs: FilePair[]; unpairedPdfs: FileItem[] } {
-  const mdMap = new Map<string, FileItem>()
-  const pdfMap = new Map<string, FileItem>()
-  const coverLetterMap = new Map<string, FileItem>()
-
-  for (const f of files) {
-    if (f.name.startsWith('cover_letter_') && f.name.endsWith('.md')) {
-      // cover_letter_<base>.md — key is the cv base name (cv_<base>)
-      const clBase = f.name.replace(/^cover_letter_/, '').replace(/\.md$/, '')
-      coverLetterMap.set(clBase, f)
-    } else if (f.name.endsWith('.md')) {
-      mdMap.set(f.name.replace(/\.md$/, ''), f)
-    } else if (f.name.endsWith('.pdf')) {
-      pdfMap.set(f.name.replace(/\.pdf$/, ''), f)
-    }
-  }
-
-  const allBases = new Set([...mdMap.keys(), ...pdfMap.keys()])
-  const pairs: FilePair[] = []
-  const unpairedPdfs: FileItem[] = []
-
-  for (const base of allBases) {
-    const md = mdMap.get(base) ?? null
-    const pdf = pdfMap.get(base) ?? null
-    // For cv_<jobBase>, look up cover_letter_<jobBase>.md
-    const cvJobBase = base.startsWith('cv_') ? base.replace(/^cv_/, '') : null
-    const coverLetter = cvJobBase ? (coverLetterMap.get(cvJobBase) ?? null) : null
-    if (md || pdf) {
-      if (!md && pdf) {
-        unpairedPdfs.push(pdf)
-      } else {
-        pairs.push({ base, md, pdf, coverLetter })
-      }
-    }
-  }
-
-  pairs.sort((a, b) => a.base.localeCompare(b.base))
-  return { pairs, unpairedPdfs }
-}
-
-function MdViewPanel({ selectedMd, content, onEdit }: { selectedMd: string; content: string; onEdit: () => void }) {
-  const [preview, setPreview] = useState(false)
-
-  // Minimal markdown → HTML rendering (headers, bold, italic, lists, paragraphs)
-  const renderMarkdown = (md: string): string => {
-    return md
-      .replace(/^---[\s\S]*?---\n*/m, '') // strip frontmatter
-      .replace(/^### (.+)$/gm, '<h3 style="font-size:1rem;font-weight:600;margin:1em 0 0.25em">$1</h3>')
-      .replace(/^## (.+)$/gm, '<h2 style="font-size:1.15rem;font-weight:700;margin:1.25em 0 0.25em">$1</h2>')
-      .replace(/^# (.+)$/gm, '<h1 style="font-size:1.3rem;font-weight:700;margin:1.5em 0 0.25em">$1</h1>')
-      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.+?)\*/g, '<em>$1</em>')
-      .replace(/^- (.+)$/gm, '<li style="margin-left:1.5em;list-style:disc">$1</li>')
-      .replace(/\n\n/g, '</p><p style="margin:0.75em 0">')
-      .replace(/^(?!<[hlp])(.+)$/gm, '$1')
-  }
-
-  return (
-    <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between border-b border-slate-700 px-4 py-2">
-        <span className="font-mono text-sm text-slate-400">{selectedMd}</span>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setPreview(p => !p)}
-            className={`rounded px-3 py-1 text-xs ${preview ? 'bg-indigo-700 text-indigo-100' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}
-          >
-            {preview ? 'Raw' : 'Preview'}
-          </button>
-          <button
-            onClick={onEdit}
-            className="rounded bg-indigo-600 px-3 py-1 text-sm text-white hover:bg-indigo-500"
-          >
-            Edit
-          </button>
-        </div>
-      </div>
-      <div className="flex-1 overflow-auto p-4">
-        {preview ? (
-          <div
-            className="text-sm text-slate-200 leading-relaxed"
-            dangerouslySetInnerHTML={{ __html: `<p style="margin:0.75em 0">${renderMarkdown(content)}</p>` }}
-          />
-        ) : (
-          <pre className="whitespace-pre-wrap font-mono text-xs text-slate-300">{content}</pre>
-        )}
-      </div>
-    </div>
-  )
-}
+type RightMode = 'none' | 'pdf' | 'md-view' | 'editor'
 
 export function OutputPage() {
   const qc = useQueryClient()
 
-  // Right panel state
-  const [rightMode, setRightMode] = useState<'none' | 'pdf' | 'md-view' | 'editor'>('none')
+  const [rightMode, setRightMode] = useState<RightMode>('none')
   const [previewPdf, setPreviewPdf] = useState<string | null>(null)
   const [selectedMd, setSelectedMd] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
   const [isDirty, setIsDirty] = useState(false)
   const [saved, setSaved] = useState(false)
-
-  // Editor mode: sections (default) vs raw
   const [sectionMode, setSectionMode] = useState(true)
-
-  // Editor split-view state
   const [showEditorSplit, setShowEditorSplit] = useState(false)
   const [pdfVersion, setPdfVersion] = useState(0)
   const [leftCollapsed, setLeftCollapsed] = useState(false)
 
-  // Dialogs / UI state
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   const [renaming, setRenaming] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
@@ -143,8 +44,8 @@ export function OutputPage() {
   const [regenDropdown, setRegenDropdown] = useState<{ pair: FilePair; md: string; top: number; left: number } | null>(null)
 
   const listQ = useQuery({ queryKey: ['out'], queryFn: listOutFiles, refetchInterval: 10000 })
-
   const { builds, run } = useBuildRun()
+
   const runBuild = (key: string, jobId: string) => run(key, jobId, () => {
     void qc.invalidateQueries({ queryKey: ['out'] })
     setPdfVersion(v => v + 1)
@@ -187,10 +88,7 @@ export function OutputPage() {
       void qc.invalidateQueries({ queryKey: ['out'] })
       setDeleteTarget(null)
       if (selectedMd === deleteTarget) {
-        setSelectedMd(null)
-        setDraft('')
-        setIsDirty(false)
-        setRightMode('none')
+        setSelectedMd(null); setDraft(''); setIsDirty(false); setRightMode('none')
       }
     },
   })
@@ -208,56 +106,40 @@ export function OutputPage() {
     setShowEditorSplit(false)
     setLeftCollapsed(false)
     if (md) {
-      setSelectedMd(md)
-      setDraft('')
-      setIsDirty(false)
-      setSaved(false)
-      setPreviewPdf(pdf)
-      setRightMode(mode)
+      setSelectedMd(md); setDraft(''); setIsDirty(false); setSaved(false)
+      setPreviewPdf(pdf); setRightMode(mode)
     } else {
-      setPreviewPdf(pdf)
-      setRightMode(pdf ? 'pdf' : 'none')
-      setSelectedMd(null)
-      setDraft('')
-      setIsDirty(false)
-      setSaved(false)
+      setPreviewPdf(pdf); setRightMode(pdf ? 'pdf' : 'none')
+      setSelectedMd(null); setDraft(''); setIsDirty(false); setSaved(false)
     }
   }
 
   const handleRowClick = (pdf: FileItem) => {
-    if (isDirty) {
-      setPendingRowSwitch({ pdf: pdf.name, md: null })
-      return
-    }
+    if (isDirty) { setPendingRowSwitch({ pdf: pdf.name, md: null }); return }
     doRowSwitch(pdf.name, null)
   }
 
   const handleViewMd = (md: FileItem) => {
-    if (isDirty) {
-      setPendingRowSwitch({ pdf: previewPdf, md: md.name, mode: 'md-view' })
-      return
-    }
-    setSelectedMd(md.name)
-    setDraft('')
-    setIsDirty(false)
-    setSaved(false)
-    setRightMode('md-view')
+    if (isDirty) { setPendingRowSwitch({ pdf: previewPdf, md: md.name, mode: 'md-view' }); return }
+    setSelectedMd(md.name); setDraft(''); setIsDirty(false); setSaved(false); setRightMode('md-view')
   }
 
   const handleEditMd = (md: FileItem) => {
     if (isDirty && selectedMd !== md.name) {
-      setPendingRowSwitch({ pdf: previewPdf, md: md.name, mode: 'editor' })
-      return
+      setPendingRowSwitch({ pdf: previewPdf, md: md.name, mode: 'editor' }); return
     }
-    setSelectedMd(md.name)
-    setDraft('')
-    setIsDirty(false)
-    setSaved(false)
-    setRightMode('editor')
+    setSelectedMd(md.name); setDraft(''); setIsDirty(false); setSaved(false); setRightMode('editor')
   }
 
   if (mdFileQ.data && draft === '' && mdFileQ.data.content) {
     setDraft(mdFileQ.data.content)
+  }
+
+  const handleRerenderMd = async (mdName: string) => {
+    try {
+      const { job_id } = await buildFromMd(`out/${mdName}`)
+      await runBuild(mdName, job_id)
+    } catch { /* ignore */ }
   }
 
   const handleSaveMd = async () => {
@@ -265,32 +147,26 @@ export function OutputPage() {
     const isLlmGenerated = !selectedMd.includes('_user')
     if (isLlmGenerated) {
       const copyName = selectedMd.replace(/\.md$/, '_user.md')
-      setSaveAsDialog({ original: selectedMd, copy: copyName })
-      return
+      setSaveAsDialog({ original: selectedMd, copy: copyName }); return
     }
     await saveMdMut.mutateAsync({ path: selectedMd, content: draft })
-    // auto-regen and open split view
-    setShowEditorSplit(true)
-    setLeftCollapsed(true)
-    void handleGeneratePdf(selectedMd)
+    setShowEditorSplit(true); setLeftCollapsed(true)
+    void handleRerenderMd(selectedMd)
   }
 
   const toggleSplit = () => {
     setShowEditorSplit(s => {
       const next = !s
-      if (next) setLeftCollapsed(true)   // auto-collapse left when opening split
-      else setLeftCollapsed(false)        // restore left when closing split
+      if (next) setLeftCollapsed(true); else setLeftCollapsed(false)
       return next
     })
   }
 
   const handleRegenPreview = async () => {
     if (!selectedMd) return
-    // save draft first if dirty
     if (isDirty) {
       const isLlmGenerated = !selectedMd.includes('_user')
       if (isLlmGenerated) {
-        // for LLM files, save to _user copy silently
         const copyName = selectedMd.replace(/\.md$/, '_user.md')
         await saveMdMut.mutateAsync({ path: copyName, content: draft })
         setSelectedMd(copyName)
@@ -298,44 +174,22 @@ export function OutputPage() {
         await saveMdMut.mutateAsync({ path: selectedMd, content: draft })
       }
     }
-    setShowEditorSplit(true)
-    setLeftCollapsed(true)
-    void handleGeneratePdf(selectedMd)
+    setShowEditorSplit(true); setLeftCollapsed(true)
+    void handleRerenderMd(selectedMd)
   }
 
   const handleCancelEdit = () => {
-    if (isDirty) {
-      setDiscardCancelDialog(true)
-    } else {
-      setShowEditorSplit(false)
-      setLeftCollapsed(false)
-      setSelectedMd(null)
-      setDraft('')
-      setRightMode(previewPdf ? 'pdf' : 'none')
-    }
+    if (isDirty) { setDiscardCancelDialog(true); return }
+    setShowEditorSplit(false); setLeftCollapsed(false)
+    setSelectedMd(null); setDraft(''); setRightMode(previewPdf ? 'pdf' : 'none')
   }
 
-  // Re-render the edited markdown file directly to PDF (no AI, no pipeline re-run)
-  // Also used as handleGeneratePdf for save-and-regen flows.
-  const handleRerenderMd = async (mdName: string) => {
-    try {
-      const { job_id } = await buildFromMd(`out/${mdName}`)
-      await runBuild(mdName, job_id)
-    } catch { /* ignore */ }
-  }
-  const handleGeneratePdf = handleRerenderMd
-
-  // Derive the job path from the CV base name.
-  // cv_job_google → jobs/google.md
-  // cv_google     → jobs/google.md  (fallback for non-standard naming)
-  // cv_generic    → null (generic build)
   const jobPathForBase = (base: string): string | null => {
     if (base.startsWith('cv_job_')) return `jobs/${base.replace(/^cv_job_/, '')}.md`
     if (base !== 'cv_generic' && base.startsWith('cv_')) return `jobs/${base.replace(/^cv_/, '')}.md`
     return null
   }
 
-  // Run the full pipeline with auto AI-provider fallback (configured → Gemini → deterministic)
   const handleGenerateAuto = async (base: string, mdName: string) => {
     try {
       const jobPath = jobPathForBase(base)
@@ -345,7 +199,6 @@ export function OutputPage() {
   }
 
   const { pairs, unpairedPdfs } = useMemo(() => groupFiles(listQ.data ?? []), [listQ.data])
-
   const handleEditorChange = useCallback((v: string) => {
     setDraft(v); setIsDirty(true); setSaved(false)
   }, [])
@@ -354,168 +207,29 @@ export function OutputPage() {
     <div className="flex h-[calc(100vh-8rem)] gap-0 overflow-hidden rounded-xl border border-slate-700">
       {/* Left panel */}
       <div className={`shrink-0 overflow-y-auto border-r border-slate-700 bg-slate-900 transition-[width] duration-200 ${leftCollapsed ? 'w-8' : 'w-64'}`}>
-        {leftCollapsed ? (
-          <div className="flex h-full flex-col items-center pt-2">
-            <button
-              onClick={() => setLeftCollapsed(false)}
-              className="rounded p-1 text-slate-500 hover:text-slate-300"
-              title="Expand file list"
-            >
-              ▶
-            </button>
-          </div>
-        ) : (
-        <><div className="flex items-center justify-between border-b border-slate-700 px-3 py-2">
-          <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Generated CVs</span>
-          <button
-            onClick={() => setLeftCollapsed(true)}
-            className="text-xs text-slate-600 hover:text-slate-400"
-            title="Collapse file list"
-          >
-            ◀
-          </button>
-        </div>
-
-        {listQ.isLoading && <p className="px-3 py-2 text-xs text-slate-500">Loading…</p>}
-
-        {pairs.length === 0 && unpairedPdfs.length === 0 && !listQ.isLoading && (
-          <p className="px-3 py-4 text-xs text-slate-500">
-            No CVs yet.{' '}
-            <Link to="/jobs" className="underline text-indigo-400">Go to Target Jobs</Link>
-            {' '}and click "Generate CV" to create one.
-          </p>
-        )}
-
-        {pairs.map(({ base, md, pdf, coverLetter }) => {
-          const b = builds[md?.name ?? ''] ?? { lines: [], status: 'idle' }
-          return (
-            <div key={base} className="border-b border-slate-800 px-3 py-3">
-              {/* Filename + rename */}
-              <div className="flex items-center gap-1 mb-2">
-                {renaming === base ? (
-                  <div className="flex flex-1 gap-1">
-                    <input
-                      autoFocus
-                      value={renameValue}
-                      onChange={e => setRenameValue(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter' && pdf) {
-                          const newName = renameValue.endsWith('.pdf') ? renameValue : `${renameValue}.pdf`
-                          renameMut.mutate({ from: pdf.name, to: newName })
-                        }
-                      }}
-                      className="flex-1 rounded border border-slate-600 bg-slate-800 px-2 py-0.5 text-xs text-slate-200 outline-none"
-                    />
-                    <button onClick={() => setRenaming(null)} className="text-xs text-slate-500">✕</button>
-                  </div>
-                ) : (
-                  <>
-                    <button
-                      className="flex-1 truncate text-left font-mono text-sm text-slate-200 hover:text-indigo-300"
-                      onClick={() => pdf && handleRowClick(pdf)}
-                      title={base}
-                    >
-                      {base}
-                    </button>
-                    <button
-                      onClick={() => { setRenaming(base); setRenameValue(base) }}
-                      className="shrink-0 text-xs text-slate-500 hover:text-slate-300"
-                      title="Rename"
-                    >
-                      ✏️
-                    </button>
-                  </>
-                )}
-              </div>
-
-              {/* Actions */}
-              <div className="flex flex-wrap gap-1">
-                {coverLetter && (
-                  <button
-                    onClick={() => handleViewMd(coverLetter)}
-                    className="rounded px-2 py-1 text-xs bg-slate-700 text-slate-200 hover:bg-slate-600"
-                    title="View cover letter"
-                  >
-                    Cover letter
-                  </button>
-                )}
-                {md && (
-                  <button
-                    onClick={() => handleViewMd(md)}
-                    className={`rounded px-2 py-1 text-xs ${selectedMd === md.name && rightMode === 'md-view' ? 'bg-slate-600 text-slate-100' : 'bg-slate-700 text-slate-200 hover:bg-slate-600'}`}
-                  >
-                    View MD
-                  </button>
-                )}
-                {md && (
-                  <button
-                    onClick={() => handleEditMd(md)}
-                    className={`rounded px-2 py-1 text-xs ${selectedMd === md.name && rightMode === 'editor' ? 'bg-indigo-700 text-indigo-100' : 'bg-slate-700 text-slate-200 hover:bg-slate-600'}`}
-                  >
-                    Edit MD
-                  </button>
-                )}
-                {md && (
-                  <div className="flex">
-                    <button
-                      onClick={() => void handleGenerateAuto(base, md.name)}
-                      disabled={b.status === 'running'}
-                      className="rounded-l bg-indigo-700 px-2 py-1 text-xs text-indigo-100 hover:bg-indigo-600 disabled:opacity-50"
-                    >
-                      {b.status === 'running' ? '…' : 'Generate CV'}
-                    </button>
-                    <button
-                      onClick={e => {
-                        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-                        const pair = { base, md, pdf, coverLetter }
-                        setRegenDropdown(prev =>
-                          prev?.md === md.name ? null : { pair, md: md.name, top: rect.bottom + 4, left: rect.left - 192 }
-                        )
-                      }}
-                      className="rounded-r border-l border-indigo-900 bg-indigo-700 px-1 py-1 text-xs text-indigo-100 hover:bg-indigo-600"
-                    >
-                      ▾
-                    </button>
-                  </div>
-                )}
-                <button
-                  onClick={() => setDeleteTarget(pdf?.name ?? md?.name ?? '')}
-                  className="rounded bg-red-950 px-2 py-1 text-xs text-red-300 hover:bg-red-900"
-                >
-                  Delete
-                </button>
-              </div>
-
-              {b.status !== 'idle' && (
-                <BuildProgress build={b} className="mt-2" />
-              )}
-            </div>
-          )
-        })}
-
-        {unpairedPdfs.length > 0 && (
-          <div className="border-t border-slate-700 px-3 py-2">
-            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">PDF only</p>
-            {unpairedPdfs.map(f => (
-              <div key={f.name} className="mb-2 flex items-center justify-between">
-                <button
-                  className="truncate font-mono text-xs text-slate-400 hover:text-indigo-300"
-                  onClick={() => handleRowClick(f)}
-                  title={f.name}
-                >
-                  {f.name}
-                </button>
-                <button
-                  onClick={() => setDeleteTarget(f.name)}
-                  className="rounded bg-red-950 px-2 py-1 text-xs text-red-300 hover:bg-red-900"
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-        </>)}
+        <OutputFileList
+          pairs={pairs}
+          unpairedPdfs={unpairedPdfs}
+          builds={builds}
+          selectedMd={selectedMd}
+          rightMode={rightMode}
+          isLoading={listQ.isLoading}
+          leftCollapsed={leftCollapsed}
+          renaming={renaming}
+          renameValue={renameValue}
+          onCollapse={setLeftCollapsed}
+          onRowClick={handleRowClick}
+          onViewMd={handleViewMd}
+          onEditMd={handleEditMd}
+          onGenerateAuto={(base, mdName) => void handleGenerateAuto(base, mdName)}
+          onSetDeleteTarget={setDeleteTarget}
+          onSetRenaming={setRenaming}
+          onSetRenameValue={setRenameValue}
+          onRename={(from, to) => renameMut.mutate({ from, to })}
+          onRegenDropdown={(pair, md, top, left) =>
+            setRegenDropdown(prev => prev?.md === md ? null : { pair, md, top, left })
+          }
+        />
       </div>
 
       {/* Right panel */}
@@ -559,7 +273,6 @@ export function OutputPage() {
         )}
         {rightMode === 'editor' && selectedMd && mdFileQ.data && (
           <div className="flex h-full overflow-hidden">
-            {/* Editor pane */}
             <div className={`flex flex-col overflow-hidden ${showEditorSplit ? 'w-1/2 border-r border-slate-700' : 'w-full'}`}>
               {(() => {
                 const editorContent = draft || mdFileQ.data.content
@@ -568,7 +281,6 @@ export function OutputPage() {
                     <button
                       onClick={() => setSectionMode(m => !m)}
                       className={`rounded px-2 py-1 text-xs hover:bg-slate-600 ${sectionMode ? 'bg-indigo-800 text-indigo-200' : 'bg-slate-700 text-slate-300'}`}
-                      title={sectionMode ? 'Switch to raw editor' : 'Switch to section editor'}
                     >
                       {sectionMode ? '§ Sections' : '§ Raw'}
                     </button>
@@ -576,14 +288,12 @@ export function OutputPage() {
                       onClick={() => void handleRegenPreview()}
                       disabled={builds[selectedMd]?.status === 'running'}
                       className="rounded bg-slate-700 px-2 py-1 text-xs text-slate-300 hover:bg-slate-600 disabled:opacity-50"
-                      title="Save draft and regenerate PDF preview"
                     >
                       {builds[selectedMd]?.status === 'running' ? '⟳ Building…' : '⟳ Regen'}
                     </button>
                     <button
                       onClick={toggleSplit}
                       className={`rounded px-2 py-1 text-xs hover:bg-slate-600 ${showEditorSplit ? 'bg-indigo-800 text-indigo-200' : 'bg-slate-700 text-slate-300'}`}
-                      title={showEditorSplit ? 'Hide PDF panel' : 'Show PDF panel'}
                     >
                       {showEditorSplit ? '⊟ PDF' : '⊞ PDF'}
                     </button>
@@ -614,7 +324,6 @@ export function OutputPage() {
                 )
               })()}
             </div>
-            {/* PDF preview pane */}
             {showEditorSplit && (
               <div className="flex w-1/2 flex-col overflow-hidden">
                 <div className="flex shrink-0 items-center justify-between border-b border-slate-700 px-3 py-2">
@@ -649,97 +358,36 @@ export function OutputPage() {
         )}
       </div>
 
-      {/* Confirm delete */}
-      {deleteTarget && (
-        <ConfirmDialog
-          title="Delete file?"
-          message={`Delete "${deleteTarget}"? This cannot be undone.`}
-          confirmLabel="Delete"
-          onConfirm={() => deleteMut.mutate(deleteTarget)}
-          onCancel={() => setDeleteTarget(null)}
-        />
-      )}
-
-      {/* Save-as dialog for LLM-generated files */}
-      {saveAsDialog && (
-        <ConfirmDialog
-          title="Save as user-edited copy?"
-          message={`Save as "${saveAsDialog.copy}" to prevent overwriting on regeneration, or overwrite the original "${saveAsDialog.original}".`}
-          confirmLabel="Save as copy"
-          cancelLabel="Overwrite original"
-          onConfirm={() => {
-            renameMut.mutate({ from: saveAsDialog.original, to: saveAsDialog.copy })
-            saveMdMut.mutate({ path: saveAsDialog.copy, content: draft })
-          }}
-          onCancel={() => saveMdMut.mutate({ path: saveAsDialog.original, content: draft })}
-        />
-      )}
-
-      {/* Unsaved changes on row switch */}
-      {pendingRowSwitch && (
-        <ConfirmDialog
-          title="Unsaved changes"
-          message="You have unsaved changes. Discard them and switch?"
-          confirmLabel="Discard"
-          cancelLabel="Keep editing"
-          onConfirm={() => {
-            const pr = pendingRowSwitch
-            setPendingRowSwitch(null)
-            doRowSwitch(pr.pdf, pr.md, pr.mode)
-          }}
-          onCancel={() => setPendingRowSwitch(null)}
-        />
-      )}
-
-      {/* Discard changes on cancel */}
-      {discardCancelDialog && (
-        <ConfirmDialog
-          title="Discard changes?"
-          message="Your unsaved changes will be lost."
-          confirmLabel="Discard"
-          cancelLabel="Keep editing"
-          onConfirm={() => {
-            setDiscardCancelDialog(false)
-            setShowEditorSplit(false)
-            setLeftCollapsed(false)
-            setSelectedMd(null)
-            setDraft('')
-            setIsDirty(false)
-            setRightMode(previewPdf ? 'pdf' : 'none')
-          }}
-          onCancel={() => setDiscardCancelDialog(false)}
-        />
-      )}
-
-      {/* Regen dropdown — portal so it escapes the scrollable left panel */}
-      {regenDropdown && createPortal(
-        <>
-          <div
-            className="fixed inset-0 z-40"
-            onClick={() => setRegenDropdown(null)}
-          />
-          <div
-            className="fixed z-50 w-56 rounded border border-slate-600 bg-slate-800 shadow-xl"
-            style={{ top: regenDropdown.top, left: regenDropdown.left }}
-          >
-            <button
-              onClick={() => { void handleGenerateAuto(regenDropdown.pair.base, regenDropdown.md); setRegenDropdown(null) }}
-              className="block w-full px-3 py-2 text-left hover:bg-slate-700"
-            >
-              <div className="text-xs font-medium text-slate-200">Generate CV</div>
-              <div className="mt-0.5 text-xs text-slate-500">AI pipeline → Gemini → original bullets</div>
-            </button>
-            <button
-              onClick={() => { void handleRerenderMd(regenDropdown.md); setRegenDropdown(null) }}
-              className="block w-full border-t border-slate-700 px-3 py-2 text-left hover:bg-slate-700"
-            >
-              <div className="text-xs font-medium text-slate-200">Rerender MD → PDF</div>
-              <div className="mt-0.5 text-xs text-slate-500">Fast, no AI — converts edited markdown to PDF</div>
-            </button>
-          </div>
-        </>,
-        document.body,
-      )}
+      <OutputDialogs
+        deleteTarget={deleteTarget}
+        saveAsDialog={saveAsDialog}
+        pendingRowSwitch={pendingRowSwitch}
+        discardCancelDialog={discardCancelDialog}
+        regenDropdown={regenDropdown}
+        previewPdf={previewPdf}
+        onDelete={name => deleteMut.mutate(name)}
+        onCancelDelete={() => setDeleteTarget(null)}
+        onSaveAsCopy={(original, copy) => {
+          renameMut.mutate({ from: original, to: copy })
+          saveMdMut.mutate({ path: copy, content: draft })
+        }}
+        onSaveAsOriginal={original => saveMdMut.mutate({ path: original, content: draft })}
+        onConfirmRowSwitch={() => {
+          const pr = pendingRowSwitch!
+          setPendingRowSwitch(null)
+          doRowSwitch(pr.pdf, pr.md, pr.mode)
+        }}
+        onCancelRowSwitch={() => setPendingRowSwitch(null)}
+        onConfirmDiscard={() => {
+          setDiscardCancelDialog(false); setShowEditorSplit(false); setLeftCollapsed(false)
+          setSelectedMd(null); setDraft(''); setIsDirty(false)
+          setRightMode(previewPdf ? 'pdf' : 'none')
+        }}
+        onCancelDiscard={() => setDiscardCancelDialog(false)}
+        onRegenAuto={(base, md) => void handleGenerateAuto(base, md)}
+        onRerender={md => void handleRerenderMd(md)}
+        onCloseRegen={() => setRegenDropdown(null)}
+      />
     </div>
   )
 }

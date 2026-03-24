@@ -110,20 +110,26 @@ async def ws_reader(ws, session: AgentSession) -> None:
     import json
 
     try:
-        async for message in ws.iter_bytes():
-            # Try to parse as JSON control frame (resize)
-            try:
-                text = message.decode("utf-8")
-                frame = json.loads(text)
-                if frame.get("type") == "resize":
-                    session.resize(int(frame["rows"]), int(frame["cols"]))
-                    continue
-            except (UnicodeDecodeError, json.JSONDecodeError, KeyError):
-                pass
-            # Raw keystroke bytes
-            try:
-                os.write(session.master_fd, message)
-            except OSError:
+        while True:
+            msg = await ws.receive()
+            if msg["type"] == "websocket.disconnect":
                 break
+            # Text frame (resize control) or binary keystrokes
+            text: str | None = msg.get("text")
+            data: bytes | None = msg.get("bytes")
+            if text:
+                try:
+                    frame = json.loads(text)
+                    if isinstance(frame, dict) and frame.get("type") == "resize":
+                        session.resize(int(frame["rows"]), int(frame["cols"]))
+                        continue
+                except (json.JSONDecodeError, KeyError, ValueError):
+                    pass
+                data = text.encode("utf-8")
+            if data:
+                try:
+                    os.write(session.master_fd, data)
+                except OSError:
+                    break
     except Exception:
         pass

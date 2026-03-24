@@ -8,91 +8,34 @@ from __future__ import annotations
 
 import json
 import re
-import shutil
 import subprocess
-import time
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 from urllib.request import Request, urlopen
-
-import yaml
 
 from cv_compiler.llm.codex import CodexExecConfig
 from cv_compiler.llm.config import LLMConfig
 from cv_compiler.llm.openai import build_chat_endpoint, build_chat_payload, extract_chat_content
 
-_SAFE_ID_RE = re.compile(r"[^a-z0-9_]+")
+from .pdf_models import IngestResult, ParsedCv, ParsedExperience, ParsedProfile, ParsedSkillCategory
+from .pdf_parser import parse_ingest_payload, parse_ingest_response
+from .pdf_writer import write_ingest_files
+
+__all__ = [
+    "IngestResult",
+    "ParsedCv",
+    "ParsedExperience",
+    "ParsedProfile",
+    "ParsedSkillCategory",
+    "extract_pdf_hyperlinks",
+    "extract_pdf_text",
+    "ingest_pdf_to_markdown",
+    "parse_ingest_payload",
+    "parse_ingest_response",
+    "write_ingest_files",
+]
+
 _MIN_TEXT_CHARS = 200
-_PLACEHOLDER = "TODO: edit this field"
-
-
-@dataclass(frozen=True, slots=True)
-class ParsedLink:
-    label: str | None
-    url: str | None
-
-
-@dataclass(frozen=True, slots=True)
-class ParsedProfile:
-    name: str | None
-    headline: str | None
-    location: str | None
-    email: str | None
-    about_me: str | None
-    links: tuple[ParsedLink, ...]
-
-
-@dataclass(frozen=True, slots=True)
-class ParsedExperience:
-    company: str | None
-    title: str | None
-    location: str | None
-    start_date: str | None
-    end_date: str | None
-    bullets: tuple[str, ...]
-    tags: tuple[str, ...]
-
-
-@dataclass(frozen=True, slots=True)
-class ParsedProject:
-    name: str | None
-    company: str | None
-    role: str | None
-    start_date: str | None
-    end_date: str | None
-    bullets: tuple[str, ...]
-    tags: tuple[str, ...]
-
-
-@dataclass(frozen=True, slots=True)
-class ParsedSkillCategory:
-    name: str | None
-    items: tuple[str, ...]
-
-
-@dataclass(frozen=True, slots=True)
-class ParsedEducation:
-    institution: str | None
-    degree: str | None
-    location: str | None
-    start_date: str | None
-    end_date: str | None
-
-
-@dataclass(frozen=True, slots=True)
-class ParsedCv:
-    profile: ParsedProfile
-    experience: tuple[ParsedExperience, ...]
-    projects: tuple[ParsedProject, ...]
-    skills: tuple[ParsedSkillCategory, ...]
-    education: tuple[ParsedEducation, ...]
-
-
-@dataclass(frozen=True, slots=True)
-class IngestResult:
-    written_paths: tuple[Path, ...]
-    warnings: tuple[str, ...]
 
 
 def extract_pdf_text(path: Path) -> str:
@@ -189,176 +132,6 @@ def ingest_pdf_to_markdown(
     return write_ingest_files(data_dir, parsed, overwrite=overwrite)
 
 
-def parse_ingest_response(text: str) -> ParsedCv:
-    try:
-        payload = json.loads(text)
-    except json.JSONDecodeError as exc:
-        raise ValueError("LLM response must be valid JSON") from exc
-    return parse_ingest_payload(payload)
-
-
-def parse_ingest_payload(payload: object) -> ParsedCv:
-    if not isinstance(payload, dict):
-        raise ValueError("Ingest payload must be a JSON object")
-
-    profile_raw = payload.get("profile")
-    if not isinstance(profile_raw, dict):
-        raise ValueError("Missing or invalid profile section")
-
-    links = _parse_links(profile_raw.get("links"))
-    email = _coerce_str(profile_raw.get("email"))
-
-    # LLMs often put the email as a mailto: link instead of the email field.
-    # Normalise: extract it from links, store in email field, drop the mailto link.
-    clean_links: list[ParsedLink] = []
-    for link in links:
-        if link.url and link.url.startswith("mailto:"):
-            addr = link.url[len("mailto:"):]
-            if addr and not email:
-                email = addr
-        else:
-            clean_links.append(link)
-
-    profile = ParsedProfile(
-        name=_coerce_str(profile_raw.get("name")),
-        headline=_coerce_str(profile_raw.get("headline")),
-        location=_coerce_str(profile_raw.get("location")),
-        email=email,
-        about_me=_coerce_str(profile_raw.get("about_me")),
-        links=tuple(clean_links),
-    )
-
-    experience = _parse_experience(payload.get("experience"))
-    projects = _parse_projects(payload.get("projects"))
-    skills = _parse_skills(payload.get("skills"))
-    education = _parse_education(payload.get("education"))
-
-    return ParsedCv(
-        profile=profile,
-        experience=experience,
-        projects=projects,
-        skills=skills,
-        education=education,
-    )
-
-
-def write_ingest_files(data_dir: Path, parsed: ParsedCv, *, overwrite: bool) -> IngestResult:
-    warnings: list[str] = []
-    written: list[Path] = []
-    data_dir.mkdir(parents=True, exist_ok=True)
-    backup_dir = _backup_ingest_files(data_dir, overwrite=overwrite)
-
-    try:
-        used_ids: set[str] = {"profile", "skills", "education"}
-
-        profile_path = data_dir / "profile.md"
-        _ensure_writable(profile_path, overwrite=False)
-        profile_frontmatter = {
-            "id": "profile",
-            "name": _require_field(parsed.profile.name, "profile.name", warnings),
-            "headline": _require_field(parsed.profile.headline, "profile.headline", warnings),
-            "location": _require_field(parsed.profile.location, "profile.location", warnings),
-            "email": parsed.profile.email,
-            "links": [
-                {
-                    "label": _require_field(link.label, "profile.links.label", warnings),
-                    "url": link.url or "",
-                }
-                for link in parsed.profile.links
-                if link.label or link.url
-            ],
-            "about_me": _require_field(parsed.profile.about_me, "profile.about_me", warnings),
-        }
-        _write_frontmatter(profile_path, profile_frontmatter, note="Generated from PDF.")
-        written.append(profile_path)
-
-        skills_path = data_dir / "skills.md"
-        _ensure_writable(skills_path, overwrite=False)
-        skills_frontmatter = {
-            "id": "skills",
-            "categories": [
-                {
-                    "name": _require_field(cat.name, "skills.category.name", warnings),
-                    "items": list(cat.items),
-                }
-                for cat in parsed.skills
-            ],
-        }
-        _write_frontmatter(skills_path, skills_frontmatter, note="Generated from PDF.")
-        written.append(skills_path)
-
-        education_path = data_dir / "education.md"
-        _ensure_writable(education_path, overwrite=False)
-        education_frontmatter = {
-            "id": "education",
-            "entries": [
-                {
-                    "institution": _require_field(
-                        entry.institution,
-                        "education.institution",
-                        warnings,
-                    ),
-                    "degree": _require_field(entry.degree, "education.degree", warnings),
-                    "location": entry.location,
-                    "start_date": entry.start_date,
-                    "end_date": entry.end_date,
-                }
-                for entry in parsed.education
-            ],
-        }
-        _write_frontmatter(education_path, education_frontmatter, note="Generated from PDF.")
-        written.append(education_path)
-
-        derived_projects: list[ParsedProject] = []
-        for idx, entry in enumerate(parsed.experience, start=1):
-            name_parts = [entry.company or "", entry.title or ""]
-            name = " - ".join(part for part in name_parts if part.strip())
-            if not name:
-                name = f"Project {idx}"
-            derived_projects.append(
-                ParsedProject(
-                    name=name,
-                    company=entry.company,
-                    role=entry.title,
-                    start_date=entry.start_date,
-                    end_date=entry.end_date,
-                    bullets=entry.bullets,
-                    tags=entry.tags,
-                )
-            )
-
-        projects_dir = data_dir / "projects"
-        projects_dir.mkdir(parents=True, exist_ok=True)
-        project_entries = list(parsed.projects) + derived_projects
-        for idx, entry in enumerate(project_entries, start=1):
-            proj_id = _unique_id(_slugify(f"proj_{entry.name or idx}"), used_ids)
-            used_ids.add(proj_id)
-            proj_path = projects_dir / f"{proj_id}.md"
-            _ensure_writable(proj_path, overwrite=False)
-            proj_frontmatter = {
-                "id": proj_id,
-                "name": _require_field(entry.name, "projects.name", warnings),
-                "company": entry.company,
-                "role": entry.role,
-                "start_date": entry.start_date,
-                "end_date": entry.end_date,
-                "tags": list(entry.tags),
-                "bullets": list(entry.bullets),
-            }
-            _write_frontmatter(proj_path, proj_frontmatter, note="Generated from PDF.")
-            written.append(proj_path)
-    except Exception:
-        if backup_dir is not None:
-            _remove_written_files(written)
-            _restore_ingest_backup(backup_dir, data_dir)
-        raise
-
-    if backup_dir is not None:
-        shutil.rmtree(backup_dir, ignore_errors=True)
-
-    return IngestResult(written_paths=tuple(written), warnings=tuple(warnings))
-
-
 def _build_ingest_prompt(path: Path, pdf_text: str, hyperlinks: list[str] | None = None) -> str:
     prompt = path.read_text(encoding="utf-8")
     text = pdf_text.strip()
@@ -407,9 +180,10 @@ def _cli_llm_content(config: CodexExecConfig, prompt: str) -> str:
         ) from exc
     if result.returncode != 0:
         stderr = result.stderr.decode("utf-8", errors="replace").strip()
-        raise ValueError(f"CLI LLM failed (exit {result.returncode}): {stderr or 'unknown error'}")
+        raise ValueError(
+            f"CLI LLM failed (exit {result.returncode}): {stderr or 'unknown error'}"
+        )
     raw = result.stdout.decode("utf-8", errors="replace").strip()
-    # Strip markdown code fences if present
     raw = re.sub(r"^```(?:json)?\s*", "", raw)
     raw = re.sub(r"\s*```$", "", raw)
     return raw.strip()
@@ -449,212 +223,6 @@ def _manual_llm_content(
     return raw
 
 
-def _parse_links(value: object) -> tuple[ParsedLink, ...]:
-    if not isinstance(value, list):
-        return ()
-    links: list[ParsedLink] = []
-    for item in value:
-        if not isinstance(item, dict):
-            continue
-        links.append(
-            ParsedLink(
-                label=_coerce_str(item.get("label")),
-                url=_coerce_str(item.get("url")),
-            )
-        )
-    return tuple(links)
-
-
-def _parse_experience(value: object) -> tuple[ParsedExperience, ...]:
-    if not isinstance(value, list):
-        return ()
-    items: list[ParsedExperience] = []
-    for item in value:
-        if not isinstance(item, dict):
-            continue
-        items.append(
-            ParsedExperience(
-                company=_coerce_str(item.get("company")),
-                title=_coerce_str(item.get("title")),
-                location=_coerce_str(item.get("location")),
-                start_date=_normalize_date(_coerce_str(item.get("start_date"))),
-                end_date=_normalize_date(_coerce_str(item.get("end_date")), is_end=True),
-                bullets=_coerce_str_list(item.get("bullets")),
-                tags=_coerce_str_list(item.get("tags")),
-            )
-        )
-    return tuple(items)
-
-
-def _parse_projects(value: object) -> tuple[ParsedProject, ...]:
-    if not isinstance(value, list):
-        return ()
-    items: list[ParsedProject] = []
-    for item in value:
-        if not isinstance(item, dict):
-            continue
-        items.append(
-            ParsedProject(
-                name=_coerce_str(item.get("name")),
-                company=_coerce_str(item.get("company")),
-                role=_coerce_str(item.get("role")),
-                start_date=_normalize_date(_coerce_str(item.get("start_date"))),
-                end_date=_normalize_date(_coerce_str(item.get("end_date")), is_end=True),
-                bullets=_coerce_str_list(item.get("bullets")),
-                tags=_coerce_str_list(item.get("tags")),
-            )
-        )
-    return tuple(items)
-
-
-def _parse_skills(value: object) -> tuple[ParsedSkillCategory, ...]:
-    if not isinstance(value, list):
-        return ()
-    items: list[ParsedSkillCategory] = []
-    for item in value:
-        if not isinstance(item, dict):
-            continue
-        items.append(
-            ParsedSkillCategory(
-                name=_coerce_str(item.get("name")),
-                items=_coerce_str_list(item.get("items")),
-            )
-        )
-    return tuple(items)
-
-
-def _parse_education(value: object) -> tuple[ParsedEducation, ...]:
-    if not isinstance(value, list):
-        return ()
-    items: list[ParsedEducation] = []
-    for item in value:
-        if not isinstance(item, dict):
-            continue
-        items.append(
-            ParsedEducation(
-                institution=_coerce_str(item.get("institution")),
-                degree=_coerce_str(item.get("degree")),
-                location=_coerce_str(item.get("location")),
-                start_date=_normalize_date(_coerce_str(item.get("start_date"))),
-                end_date=_normalize_date(_coerce_str(item.get("end_date")), is_end=True),
-            )
-        )
-    return tuple(items)
-
-
-def _coerce_str(value: object) -> str | None:
-    if isinstance(value, str):
-        text = value.strip()
-        return text if text else None
-    return None
-
-
-def _normalize_date(value: str | None, *, is_end: bool = False) -> str | None:
-    """Keep dates as-is; year-only values (YYYY) are valid and preserved."""
-    _ = is_end  # reserved for future use
-    return value
-
-
-def _coerce_str_list(value: object) -> tuple[str, ...]:
-    if not isinstance(value, list):
-        return ()
-    items: list[str] = []
-    for item in value:
-        if not isinstance(item, str):
-            continue
-        text = item.strip()
-        if text:
-            items.append(text)
-    return tuple(items)
-
-
-def _require_field(value: str | None, field: str, warnings: list[str]) -> str:
-    if value:
-        return value
-    warnings.append(f"Missing {field}; set placeholder.")
-    return _PLACEHOLDER
-
-
-def _write_frontmatter(path: Path, frontmatter: dict[str, Any], note: str) -> None:
-    content = "---\n"
-    content += yaml.safe_dump(frontmatter, sort_keys=False).strip()
-    content += "\n---\n\n"
-    content += "Notes (not rendered):\n"
-    content += f"- {note}\n"
-    path.write_text(content, encoding="utf-8")
-
-
-def _collect_ingest_files(data_dir: Path) -> tuple[Path, ...]:
-    candidates = [
-        data_dir / "profile.md",
-        data_dir / "skills.md",
-        data_dir / "education.md",
-    ]
-    for subdir in ("projects", "experience"):
-        dir_path = data_dir / subdir
-        if dir_path.exists():
-            candidates.extend(sorted(dir_path.glob("*.md")))
-    return tuple(path for path in candidates if path.exists())
-
-
-def _backup_ingest_files(data_dir: Path, *, overwrite: bool) -> Path | None:
-    if not overwrite:
-        return None
-    candidates = _collect_ingest_files(data_dir)
-    if not candidates:
-        return None
-    backup_root = data_dir.parent / "tmp"
-    backup_root.mkdir(parents=True, exist_ok=True)
-    backup_dir = backup_root / f"ingest_backup_{int(time.time() * 1000)}"
-    backup_dir.mkdir(parents=True, exist_ok=True)
-    for path in candidates:
-        rel = path.relative_to(data_dir)
-        dest = backup_dir / rel
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        shutil.move(path, dest)
-    return backup_dir
-
-
-def _restore_ingest_backup(backup_dir: Path, data_dir: Path) -> None:
-    if not backup_dir.exists():
-        return
-    for path in sorted(backup_dir.rglob("*")):
-        if path.is_dir():
-            continue
-        rel = path.relative_to(backup_dir)
-        dest = data_dir / rel
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        if dest.exists():
-            dest.unlink()
-        shutil.move(path, dest)
-    shutil.rmtree(backup_dir, ignore_errors=True)
-
-
-def _remove_written_files(written: list[Path]) -> None:
-    for path in written:
-        if path.exists():
-            path.unlink()
-
-
-def _ensure_writable(path: Path, *, overwrite: bool) -> None:
-    if path.exists() and not overwrite:
-        raise ValueError(f"Refusing to overwrite existing file: {path}")
-
-
-def _slugify(text: str) -> str:
-    slug = _SAFE_ID_RE.sub("_", text.strip().lower()).strip("_")
-    return slug or "item"
-
-
-def _unique_id(base: str, used: set[str]) -> str:
-    candidate = base
-    counter = 2
-    while candidate in used:
-        candidate = f"{base}_{counter}"
-        counter += 1
-    return candidate
-
-
 def _ingest_schema() -> dict[str, object]:
     return {
         "type": "json_schema",
@@ -668,14 +236,7 @@ def _ingest_schema() -> dict[str, object]:
                     "profile": {
                         "type": "object",
                         "additionalProperties": False,
-                        "required": [
-                            "name",
-                            "headline",
-                            "location",
-                            "email",
-                            "links",
-                            "about_me",
-                        ],
+                        "required": ["name", "headline", "location", "email", "links", "about_me"],
                         "properties": {
                             "name": {"type": "string"},
                             "headline": {"type": "string"},
@@ -702,13 +263,8 @@ def _ingest_schema() -> dict[str, object]:
                             "type": "object",
                             "additionalProperties": False,
                             "required": [
-                                "company",
-                                "title",
-                                "location",
-                                "start_date",
-                                "end_date",
-                                "bullets",
-                                "tags",
+                                "company", "title", "location",
+                                "start_date", "end_date", "bullets", "tags",
                             ],
                             "properties": {
                                 "company": {"type": "string"},
@@ -727,13 +283,8 @@ def _ingest_schema() -> dict[str, object]:
                             "type": "object",
                             "additionalProperties": False,
                             "required": [
-                                "name",
-                                "company",
-                                "role",
-                                "start_date",
-                                "end_date",
-                                "bullets",
-                                "tags",
+                                "name", "company", "role",
+                                "start_date", "end_date", "bullets", "tags",
                             ],
                             "properties": {
                                 "name": {"type": "string"},
@@ -764,11 +315,7 @@ def _ingest_schema() -> dict[str, object]:
                             "type": "object",
                             "additionalProperties": False,
                             "required": [
-                                "institution",
-                                "degree",
-                                "location",
-                                "start_date",
-                                "end_date",
+                                "institution", "degree", "location", "start_date", "end_date",
                             ],
                             "properties": {
                                 "institution": {"type": "string"},
