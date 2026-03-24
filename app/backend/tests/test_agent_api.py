@@ -33,7 +33,7 @@ def test_agent_ws_starts_session(mock_ws_reader, mock_pty_reader, mock_start, cl
     mock_session.proc.pid = None
     mock_start.return_value = mock_session
 
-    with client.websocket_connect("/ws/agent?cli=claude") as ws:
+    with client.websocket_connect("/ws/agent?cli=claude"):
         pass  # Disconnect immediately
 
     # start_session was called → connection was accepted
