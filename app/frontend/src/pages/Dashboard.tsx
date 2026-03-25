@@ -192,6 +192,12 @@ export function Dashboard() {
                       ? ' (Anthropic account)'
                       : ' (Google account for Gemini)'}.
                     {' '}AI features won't work until this is done.
+                    {(!authQ.data?.provider || authQ.data?.provider === 'gemini') && (
+                      <span className="block mt-1 text-slate-400">
+                        Gemini default model is <strong className="text-slate-300">gemini-2.0-flash</strong> (1500 req/day free).
+                        {' '}<Link to="/build" className="underline text-indigo-400">Change in Gen Config</Link> if needed.
+                      </span>
+                    )}
                   </>
                 )}
               </span>

@@ -39,6 +39,12 @@ const AI_PROVIDER_OPTIONS = [
 ] as const
 type AiProvider = typeof AI_PROVIDER_OPTIONS[number]['value']
 
+const GEMINI_MODEL_OPTIONS = [
+  { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash', desc: '1500 req/day free — recommended' },
+  { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', desc: '50 req/day free — most capable' },
+  { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash', desc: 'Legacy, very high free limits' },
+] as const
+
 const ADV_TIMEOUT_LABELS: Record<string, { label: string; tip: string }> = {
   CV_AGENT_TIMEOUT_JOB_ANALYSIS: { label: 'Job Analysis Timeout (s)', tip: 'Timeout for the job analysis step.' },
   CV_AGENT_TIMEOUT_EXPERIENCE: { label: 'Experience Timeout (s)', tip: 'Timeout for experience bullet generation.' },
@@ -214,6 +220,30 @@ export function BuildPage() {
                   )
                 })}
               </div>
+              {/* Inline Gemini model selector */}
+              {(localConfig.basic['CV_AI_PROVIDER'] ?? 'gemini') === 'gemini' && (
+                <div className="mt-3 rounded-lg border border-slate-700 bg-slate-800/50 p-3">
+                  <label className="mb-2 block text-xs text-slate-400">Gemini model</label>
+                  <div className="space-y-1.5">
+                    {GEMINI_MODEL_OPTIONS.map(opt => (
+                      <label key={opt.value} className="flex cursor-pointer items-start gap-2">
+                        <input
+                          type="radio"
+                          name="gemini-model"
+                          value={opt.value}
+                          checked={(localConfig.basic['CV_GEMINI_MODEL'] || 'gemini-2.0-flash') === opt.value}
+                          onChange={() => setBasic('CV_GEMINI_MODEL', opt.value)}
+                          className="mt-0.5 accent-indigo-500"
+                        />
+                        <span className="text-sm text-slate-300">
+                          <strong>{opt.label}</strong>
+                          <span className="ml-2 text-slate-500">— {opt.desc}</span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
               {/* Inline Custom endpoint fields */}
               {(localConfig.basic['CV_AI_PROVIDER'] ?? 'gemini') === 'custom' && (
                 <div className="mt-3 space-y-2 rounded-lg border border-slate-700 bg-slate-800/50 p-3">
