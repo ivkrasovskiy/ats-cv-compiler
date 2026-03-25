@@ -28,8 +28,26 @@ class RepairEvent:
 _subscribers: list[asyncio.Queue[dict]] = []
 _latest_event: RepairEvent | None = None
 _last_check_ts: str | None = None
+_shutdown_event: asyncio.Event | None = None
 
 POLL_INTERVAL = 60  # seconds
+
+
+def get_shutdown_event() -> asyncio.Event:
+    """Return the process-level shutdown event (created lazily)."""
+    global _shutdown_event
+    if _shutdown_event is None:
+        _shutdown_event = asyncio.Event()
+    return _shutdown_event
+
+
+def signal_shutdown() -> None:
+    """Signal all SSE generators to exit. Called from lifespan on shutdown."""
+    global _shutdown_event
+    if _shutdown_event is not None:
+        _shutdown_event.set()
+    # Reset so a fresh event is created if the module is reused (e.g. tests)
+    _shutdown_event = None
 
 
 def subscribe() -> asyncio.Queue[dict]:
