@@ -14,12 +14,27 @@ router = APIRouter(prefix="/api/repair", tags=["repair"])
 
 async def _sse_generator() -> AsyncGenerator[str, None]:
     queue = repair_service.subscribe()
+    shutdown = repair_service.get_shutdown_event()
     try:
-        while True:
-            try:
-                event = await asyncio.wait_for(queue.get(), timeout=30)
-                yield f"data: {json.dumps(event)}\n\n"
-            except TimeoutError:
+        while not shutdown.is_set():
+            queue_task = asyncio.ensure_future(queue.get())
+            shutdown_task = asyncio.ensure_future(shutdown.wait())
+            done, pending = await asyncio.wait(
+                [queue_task, shutdown_task],
+                return_when=asyncio.FIRST_COMPLETED,
+                timeout=30,
+            )
+            for t in pending:
+                t.cancel()
+                try:
+                    await t
+                except (asyncio.CancelledError, Exception):
+                    pass
+            if shutdown.is_set():
+                break
+            if queue_task in done:
+                yield f"data: {json.dumps(queue_task.result())}\n\n"
+            else:
                 yield ": heartbeat\n\n"
     finally:
         repair_service.unsubscribe(queue)

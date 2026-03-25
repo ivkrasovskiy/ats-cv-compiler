@@ -42,7 +42,11 @@ async def lifespan(app: FastAPI):
 
     task = asyncio.create_task(repair_loop(log_dir, get_project_root()))
     yield
-    # Shutdown: cancel repair loop, kill all open PTY sessions
+    # Signal SSE generators to exit immediately (unblocks uvicorn graceful shutdown)
+    from app.backend.services.repair_service import signal_shutdown
+
+    signal_shutdown()
+    # Cancel repair loop, kill all open PTY sessions
     task.cancel()
     try:
         await task
@@ -91,7 +95,13 @@ app = create_app()
 def start() -> None:
     import uvicorn
 
-    uvicorn.run("app.backend.main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run(
+        "app.backend.main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True,
+        timeout_graceful_shutdown=5,  # force-close lingering connections after 5s on reload
+    )
 
 
 if __name__ == "__main__":
