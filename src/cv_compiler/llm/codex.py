@@ -168,8 +168,13 @@ class CodexExecProvider(LLMProvider):
             enable_progress=self._config.progress,
         )
         cmd = [self._config.command, "exec", *exec_args]
+        # Gemini CLI uses GEMINI_MODEL env var; other CLIs (codex, claude) use --model flag
+        env: dict[str, str] | None = None
         if self._config.model:
-            cmd.extend(["--model", self._config.model])
+            if self._config.command == "gemini":
+                env = {**os.environ, "GEMINI_MODEL": self._config.model}
+            else:
+                cmd.extend(["--model", self._config.model])
         try:
             if use_json and self._config.progress:
                 result = _run_codex_with_spinner(
@@ -177,6 +182,7 @@ class CodexExecProvider(LLMProvider):
                     prompt=prompt,
                     prompt_mode=self._config.prompt_mode,
                     timeout=self._config.timeout_seconds,
+                    env=env,
                 )
             elif self._config.prompt_mode == "arg":
                 result = subprocess.run(
@@ -185,6 +191,7 @@ class CodexExecProvider(LLMProvider):
                     text=True,
                     timeout=self._config.timeout_seconds,
                     check=False,
+                    env=env,
                 )
             else:
                 result = subprocess.run(
@@ -194,6 +201,7 @@ class CodexExecProvider(LLMProvider):
                     text=True,
                     timeout=self._config.timeout_seconds,
                     check=False,
+                    env=env,
                 )
         except FileNotFoundError as exc:
             raise ValueError(
@@ -294,6 +302,7 @@ def _run_codex_with_spinner(
     prompt: str,
     prompt_mode: str,
     timeout: int,
+    env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     if prompt_mode == "arg":
         proc = subprocess.Popen(
@@ -301,6 +310,7 @@ def _run_codex_with_spinner(
             stdout=subprocess.DEVNULL,
             stderr=subprocess.PIPE,
             text=True,
+            env=env,
         )
     else:
         proc = subprocess.Popen(
@@ -309,6 +319,7 @@ def _run_codex_with_spinner(
             stdout=subprocess.DEVNULL,
             stderr=subprocess.PIPE,
             text=True,
+            env=env,
         )
         assert proc.stdin is not None
         proc.stdin.write(prompt)

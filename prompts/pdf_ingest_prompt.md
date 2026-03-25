@@ -6,6 +6,10 @@ You are given raw text extracted from a PDF CV. Convert it into JSON that matche
 - If a field is missing or unclear, output an empty string or empty list.
 - Output JSON only. No commentary, no markdown fences.
 
+## Ordering
+Always output entries **newest-first** (most recent role, project, or education entry first).
+This applies to `experience`, `projects`, and `education` arrays.
+
 ## Projects — always populate this list
 The `projects` array must never be empty if the CV has any work history.
 

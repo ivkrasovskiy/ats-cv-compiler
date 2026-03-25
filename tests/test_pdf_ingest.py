@@ -144,11 +144,11 @@ class TestPdfIngest(unittest.TestCase):
 class TestCliLlmContent(unittest.TestCase):
     _VALID_RESPONSE = json.dumps({"answer": "42"})
 
-    def _config(self, *, prompt_mode: str) -> CodexExecConfig:
+    def _config(self, *, prompt_mode: str, model: str | None = None) -> CodexExecConfig:
         return CodexExecConfig(
             command="mycli",
             args=("-p",),
-            model=None,
+            model=model,
             timeout_seconds=30,
             prompt_mode=prompt_mode,
             progress=False,
@@ -186,3 +186,67 @@ class TestCliLlmContent(unittest.TestCase):
         with patch("subprocess.run", side_effect=FileNotFoundError):
             with self.assertRaises(ValueError, msg="CLI command not found"):
                 _cli_llm_content(self._config(prompt_mode="stdin"), "hi")
+
+    def test_model_sets_gemini_model_env(self) -> None:
+        """When model is set, GEMINI_MODEL env var is passed to subprocess."""
+        config = self._config(prompt_mode="arg", model="gemini-2.0-flash")
+        with patch("subprocess.run", return_value=self._make_completed(self._VALID_RESPONSE)) as mock_run:
+            _cli_llm_content(config, "hello")
+        env = mock_run.call_args[1].get("env")
+        self.assertIsNotNone(env)
+        self.assertEqual(env["GEMINI_MODEL"], "gemini-2.0-flash")
+
+    def test_no_model_passes_no_env(self) -> None:
+        """When model is None, env is not overridden."""
+        config = self._config(prompt_mode="arg", model=None)
+        with patch("subprocess.run", return_value=self._make_completed(self._VALID_RESPONSE)) as mock_run:
+            _cli_llm_content(config, "hello")
+        env = mock_run.call_args[1].get("env")
+        self.assertIsNone(env)
+
+
+class TestProviderResolution(unittest.TestCase):
+    def _resolve(self, provider: str, gemini_model: str | None = None) -> object:
+        from cv_compiler.llm.provider import resolve_from_env
+        import tempfile, os
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".env", delete=False) as f:
+            f.write(f"CV_AI_PROVIDER={provider}\n")
+            if gemini_model:
+                f.write(f"CV_GEMINI_MODEL={gemini_model}\n")
+            tmp = f.name
+        try:
+            return resolve_from_env(Path(tmp))
+        finally:
+            os.unlink(tmp)
+
+    def test_gemini_uses_flash_default(self) -> None:
+        r = self._resolve("gemini")
+        self.assertEqual(r.ingest_mode, "cli")
+        self.assertIsNotNone(r.codex_config)
+        self.assertEqual(r.codex_config.command, "gemini")
+        self.assertEqual(r.codex_config.model, "gemini-2.0-flash")
+
+    def test_gemini_custom_model(self) -> None:
+        r = self._resolve("gemini", gemini_model="gemini-2.5-pro")
+        self.assertEqual(r.codex_config.model, "gemini-2.5-pro")
+
+    def test_claude_ingest_mode(self) -> None:
+        r = self._resolve("claude")
+        self.assertEqual(r.ingest_mode, "cli")
+        self.assertEqual(r.codex_config.command, "claude")
+        self.assertIsNone(r.codex_config.model)
+        self.assertEqual(r.codex_config.prompt_mode, "stdin")
+
+    def test_custom_uses_api_mode(self) -> None:
+        import tempfile, os as _os
+        from cv_compiler.llm.provider import resolve_from_env
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".env", delete=False) as f:
+            f.write("CV_AI_PROVIDER=custom\nCV_LLM_BASE_URL=http://localhost:1234\nCV_LLM_MODEL=test\n")
+            tmp = f.name
+        try:
+            r = resolve_from_env(Path(tmp))
+        finally:
+            _os.unlink(tmp)
+        self.assertEqual(r.ingest_mode, "api")
+        self.assertIsNone(r.codex_config)
+        self.assertIsNotNone(r.llm_config)
