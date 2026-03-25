@@ -95,7 +95,13 @@ app = create_app()
 def start() -> None:
     import uvicorn
 
-    uvicorn.run("app.backend.main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run(
+        "app.backend.main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True,
+        timeout_graceful_shutdown=5,  # force-close lingering connections after 5s on reload
+    )
 
 
 if __name__ == "__main__":
