@@ -5,6 +5,7 @@ from app.backend.services.file_service import get_project_root
 CONFIG_GROUPS = {
     "basic": [
         "CV_AI_PROVIDER",
+        "CV_GEMINI_MODEL",
         "CV_AGENT_CHAIN_ENABLED",
         "CV_AGENT_MAX_BULLET_CHARS",
         "CV_AGENT_MAX_SUMMARY_CHARS",

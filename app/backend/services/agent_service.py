@@ -64,12 +64,20 @@ class AgentSession:
 def start_session(cli: str, cwd: Path) -> AgentSession:
     import pty
 
+    from cv_compiler.llm.config import read_env_file
+
     argv = _resolve_cli(cli)
     master_fd, slave_fd = pty.openpty()
 
     env = os.environ.copy()
     env["TERM"] = "xterm-256color"
     env["CV_PROJECT_ROOT"] = str(cwd)
+
+    # Gemini CLI: set model from config (default: gemini-2.0-flash for free-tier availability)
+    if cli == "gemini":
+        raw = read_env_file(cwd / "config" / "llm.env")
+        model = raw.get("CV_GEMINI_MODEL", "").strip() or "gemini-2.0-flash"
+        env["GEMINI_MODEL"] = model
 
     proc = subprocess.Popen(
         argv,
