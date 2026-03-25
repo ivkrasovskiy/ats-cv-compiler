@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import hashlib
 import re
 import shutil
 import time
+import unicodedata
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +15,44 @@ import yaml
 from .pdf_models import IngestResult, ParsedCv, ParsedProject
 
 _SAFE_ID_RE = re.compile(r"[^a-z0-9_]+")
+_MAX_SLUG_LEN = 50
+
+# Cyrillic → Latin transliteration table (covers full Russian alphabet)
+_CYRILLIC: dict[str, str] = {
+    "а": "a",
+    "б": "b",
+    "в": "v",
+    "г": "g",
+    "д": "d",
+    "е": "e",
+    "ё": "yo",
+    "ж": "zh",
+    "з": "z",
+    "и": "i",
+    "й": "j",
+    "к": "k",
+    "л": "l",
+    "м": "m",
+    "н": "n",
+    "о": "o",
+    "п": "p",
+    "р": "r",
+    "с": "s",
+    "т": "t",
+    "у": "u",
+    "ф": "f",
+    "х": "kh",
+    "ц": "ts",
+    "ч": "ch",
+    "ш": "sh",
+    "щ": "sch",
+    "ъ": "",
+    "ы": "y",
+    "ь": "",
+    "э": "e",
+    "ю": "yu",
+    "я": "ya",
+}
 _PLACEHOLDER = "TODO: edit this field"
 
 
@@ -86,11 +126,17 @@ def write_ingest_files(data_dir: Path, parsed: ParsedCv, *, overwrite: bool) -> 
             name = " - ".join(part for part in name_parts if part.strip())
             if not name:
                 name = f"Project {idx}"
-            derived_projects.append(ParsedProject(
-                name=name, company=entry.company, role=entry.title,
-                start_date=entry.start_date, end_date=entry.end_date,
-                bullets=entry.bullets, tags=entry.tags,
-            ))
+            derived_projects.append(
+                ParsedProject(
+                    name=name,
+                    company=entry.company,
+                    role=entry.title,
+                    start_date=entry.start_date,
+                    end_date=entry.end_date,
+                    bullets=entry.bullets,
+                    tags=entry.tags,
+                )
+            )
 
         projects_dir = data_dir / "projects"
         projects_dir.mkdir(parents=True, exist_ok=True)
@@ -186,8 +232,15 @@ def _ensure_writable(path: Path, *, overwrite: bool) -> None:
 
 
 def _slugify(text: str) -> str:
-    slug = _SAFE_ID_RE.sub("_", text.strip().lower()).strip("_")
-    return slug or "item"
+    text = text.strip().lower()
+    # Transliterate Cyrillic, then NFKD-normalize accented Latin
+    chars = [_CYRILLIC.get(ch, ch) for ch in text]
+    ascii_text = unicodedata.normalize("NFKD", "".join(chars))
+    ascii_text = ascii_text.encode("ascii", errors="ignore").decode("ascii")
+    slug = _SAFE_ID_RE.sub("_", ascii_text).strip("_")
+    slug = slug[:_MAX_SLUG_LEN].rstrip("_")
+    # Non-Latin fallback (Chinese, Arabic, etc.): stable short hash
+    return slug or "item_" + hashlib.sha1(text.encode()).hexdigest()[:8]
 
 
 def _unique_id(base: str, used: set[str]) -> str:
