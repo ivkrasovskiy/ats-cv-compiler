@@ -212,6 +212,9 @@ jobs/*
 !jobs/README.md
 .DS_Store
 
+# Auto-generated metadata (regenerated on every save by Stop hook)
+docs/code_metadata.md
+
 # Playwright E2E test artifacts
 app/e2e/test-results/
 app/e2e/playwright-report/

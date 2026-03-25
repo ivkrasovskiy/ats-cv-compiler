@@ -7,6 +7,7 @@ Extracts machine-readable text, uses an LLM to structure it, and writes `.md` fi
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -166,6 +167,8 @@ def _cli_llm_content(config: CodexExecConfig, prompt: str) -> str:
     else:
         cmd = [config.command, *config.args]
         stdin_data = prompt.encode("utf-8")
+    # Gemini CLI uses GEMINI_MODEL env var to select the model
+    env = {**os.environ, "GEMINI_MODEL": config.model} if config.model else None
     try:
         result = subprocess.run(
             cmd,
@@ -173,6 +176,7 @@ def _cli_llm_content(config: CodexExecConfig, prompt: str) -> str:
             capture_output=True,
             timeout=config.timeout_seconds,
             check=False,
+            env=env,
         )
     except FileNotFoundError as exc:
         raise ValueError(
