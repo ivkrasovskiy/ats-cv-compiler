@@ -30,13 +30,18 @@ def resolve_from_env(env_path: Path = Path("config/llm.env")) -> ResolvedProvide
     provider = provider.strip().lower()
 
     if provider == "gemini":
+        gemini_model = (
+            os.getenv("CV_GEMINI_MODEL")
+            or file_values.get("CV_GEMINI_MODEL")
+            or "gemini-2.0-flash"
+        )
         return ResolvedProvider(
             ingest_mode="cli",
             llm_config=None,
             codex_config=CodexExecConfig(
                 command="gemini",
                 args=("-p",),
-                model=None,
+                model=gemini_model,
                 timeout_seconds=300,
                 prompt_mode="arg",
                 progress=False,
