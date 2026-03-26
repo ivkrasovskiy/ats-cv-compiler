@@ -14,6 +14,8 @@ interface Props {
   leftCollapsed: boolean
   renaming: string | null
   renameValue: string
+  sortOrder: 'newest' | 'oldest' | 'alpha'
+  onSortChange: (order: 'newest' | 'oldest' | 'alpha') => void
   onCollapse: (v: boolean) => void
   onRowClick: (pdf: FileItem) => void
   onViewMd: (md: FileItem) => void
@@ -36,6 +38,8 @@ export function OutputFileList({
   leftCollapsed,
   renaming,
   renameValue,
+  sortOrder,
+  onSortChange,
   onCollapse,
   onRowClick,
   onViewMd,
@@ -65,13 +69,24 @@ export function OutputFileList({
     <>
       <div className="flex items-center justify-between border-b border-slate-700 px-3 py-2">
         <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Generated CVs</span>
-        <button
-          onClick={() => onCollapse(true)}
-          className="text-xs text-slate-600 hover:text-slate-400"
-          title="Collapse file list"
-        >
-          ◀
-        </button>
+        <div className="flex items-center gap-1">
+          <select
+            value={sortOrder}
+            onChange={e => onSortChange(e.target.value as 'newest' | 'oldest' | 'alpha')}
+            className="rounded border border-slate-700 bg-slate-800 px-1 py-0.5 text-xs text-slate-400 outline-none focus:border-indigo-500"
+          >
+            <option value="newest">Newest</option>
+            <option value="oldest">Oldest</option>
+            <option value="alpha">A–Z</option>
+          </select>
+          <button
+            onClick={() => onCollapse(true)}
+            className="text-xs text-slate-600 hover:text-slate-400"
+            title="Collapse file list"
+          >
+            ◀
+          </button>
+        </div>
       </div>
 
       {isLoading && <p className="px-3 py-2 text-xs text-slate-500">Loading…</p>}

@@ -42,6 +42,7 @@ export function OutputPage() {
   const [pendingRowSwitch, setPendingRowSwitch] = useState<{ pdf: string | null; md: string | null; mode?: 'editor' | 'md-view' } | null>(null)
   const [discardCancelDialog, setDiscardCancelDialog] = useState(false)
   const [regenDropdown, setRegenDropdown] = useState<{ pair: FilePair; md: string; top: number; left: number } | null>(null)
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest' | 'alpha'>('newest')
 
   const listQ = useQuery({ queryKey: ['out'], queryFn: listOutFiles, refetchInterval: 10000 })
   const { builds, run } = useBuildRun()
@@ -198,7 +199,24 @@ export function OutputPage() {
     } catch { /* ignore */ }
   }
 
-  const { pairs, unpairedPdfs } = useMemo(() => groupFiles(listQ.data ?? []), [listQ.data])
+  const { pairs, unpairedPdfs } = useMemo(() => {
+    const result = groupFiles(listQ.data ?? [])
+    if (sortOrder === 'newest') {
+      result.pairs.sort((a, b) => {
+        const at = Math.max(a.pdf?.mtime ?? 0, a.md?.mtime ?? 0)
+        const bt = Math.max(b.pdf?.mtime ?? 0, b.md?.mtime ?? 0)
+        return bt - at
+      })
+    } else if (sortOrder === 'oldest') {
+      result.pairs.sort((a, b) => {
+        const at = Math.max(a.pdf?.mtime ?? 0, a.md?.mtime ?? 0)
+        const bt = Math.max(b.pdf?.mtime ?? 0, b.md?.mtime ?? 0)
+        return at - bt
+      })
+    }
+    // 'alpha' keeps groupFiles default (localeCompare)
+    return result
+  }, [listQ.data, sortOrder])
   const handleEditorChange = useCallback((v: string) => {
     setDraft(v); setIsDirty(true); setSaved(false)
   }, [])
@@ -217,6 +235,8 @@ export function OutputPage() {
           leftCollapsed={leftCollapsed}
           renaming={renaming}
           renameValue={renameValue}
+          sortOrder={sortOrder}
+          onSortChange={setSortOrder}
           onCollapse={setLeftCollapsed}
           onRowClick={handleRowClick}
           onViewMd={handleViewMd}
