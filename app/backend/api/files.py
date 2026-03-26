@@ -94,6 +94,8 @@ def get_job_file(name: str) -> dict:
 
 @router.put("/files/jobs/{name:path}")
 def put_job_file(name: str, body: Annotated[dict, Body()]) -> dict:
+    if "/" in name or "\\" in name:
+        raise HTTPException(400, "Job filenames must not contain path separators. Replace '/' with '-'.")
     root = get_project_root()
     try:
         write_file(root / "jobs", name, body.get("content", ""))

@@ -15,12 +15,18 @@ import { Tooltip } from '../components/Tooltip'
 import { useBuildRun } from '../hooks/useBuildRun'
 import { BuildProgress } from '../components/BuildProgress'
 
+// Mirror of pipeline._sanitize_stem: replace non-alnum/-/_ with underscore, strip edges
+function sanitizeStem(stem: string): string {
+  return stem.replace(/[^a-zA-Z0-9\-_]/g, '_').replace(/^_+|_+$/g, '') || 'job'
+}
+
 export function JobsPage() {
   const qc = useQueryClient()
   const [editing, setEditing] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
   const [newName, setNewName] = useState('')
   const [creating, setCreating] = useState(false)
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest' | 'alpha'>('newest')
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   const [previewJob, setPreviewJob] = useState<string | null>(null)
   const [expandedJob, setExpandedJob] = useState<string | null>(null)
@@ -70,14 +76,12 @@ export function JobsPage() {
 
   const outNames = new Set((outQ.data ?? []).map((f: FileItem) => f.name))
 
-  // The pipeline names the output cv_<job.id>.pdf where job.id comes from the job
-  // file's frontmatter `id` field. If that id starts with "job_" (e.g. job_google)
-  // the output is cv_job_google.pdf; otherwise it's cv_<stem>.pdf.
-  // So we check both possibilities.
+  // The pipeline names the output cv_<sanitize(job.id)>.pdf.
+  // job.id defaults to the file stem when no frontmatter id is set.
   const cvFileName = (jobName: string): string | null => {
-    const base = jobName.replace(/\.md$/, '')
-    if (outNames.has(`cv_job_${base}.pdf`)) return `cv_job_${base}.pdf`
-    if (outNames.has(`cv_${base}.pdf`)) return `cv_${base}.pdf`
+    const slug = sanitizeStem(jobName.replace(/\.md$/, ''))
+    if (outNames.has(`cv_job_${slug}.pdf`)) return `cv_job_${slug}.pdf`
+    if (outNames.has(`cv_${slug}.pdf`)) return `cv_${slug}.pdf`
     return null
   }
 
@@ -95,7 +99,12 @@ export function JobsPage() {
     } catch { /* ignore */ }
   }
 
-  const visibleJobs = (listQ.data ?? []).filter(f => f.name.toLowerCase() !== 'readme.md')
+  const visibleJobs = (() => {
+    const filtered = (listQ.data ?? []).filter(f => f.name.toLowerCase() !== 'readme.md')
+    if (sortOrder === 'newest') return [...filtered].sort((a, b) => (b.mtime ?? 0) - (a.mtime ?? 0))
+    if (sortOrder === 'oldest') return [...filtered].sort((a, b) => (a.mtime ?? 0) - (b.mtime ?? 0))
+    return [...filtered].sort((a, b) => a.name.localeCompare(b.name))
+  })()
 
   const handleGenerateAll = async () => {
     for (const f of visibleJobs) {
@@ -129,7 +138,16 @@ export function JobsPage() {
             {' '}is just plain text with optional formatting like <code className="rounded bg-slate-800 px-1 text-slate-300">**bold**</code> or bullet lists. You can paste a raw job description and it works fine as-is.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          <select
+            value={sortOrder}
+            onChange={e => setSortOrder(e.target.value as 'newest' | 'oldest' | 'alpha')}
+            className="rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-xs text-slate-300 outline-none focus:border-indigo-500"
+          >
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
+            <option value="alpha">A–Z</option>
+          </select>
           <button
             onClick={() => void handleGenerateAll()}
             disabled={!visibleJobs.length}
@@ -153,7 +171,7 @@ export function JobsPage() {
           <div>
             <input
               value={newName}
-              onChange={e => setNewName(e.target.value)}
+              onChange={e => setNewName(e.target.value.replace(/\//g, '-'))}
               placeholder="e.g. google_swe.md"
               className={`w-full rounded-lg border px-3 py-2 text-sm text-slate-200 placeholder-slate-500 outline-none bg-slate-800 ${
                 newName && !newName.endsWith('.md')
