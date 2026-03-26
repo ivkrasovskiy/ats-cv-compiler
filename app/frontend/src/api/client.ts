@@ -66,17 +66,17 @@ export const listJobFiles = () =>
   fetch(`${BASE}/files/jobs`).then(r => json<FileItem[]>(r))
 
 export const getJobFile = (name: string) =>
-  fetch(`${BASE}/files/jobs/${name}`).then(r => json<{ name: string; content: string }>(r))
+  fetch(`${BASE}/files/jobs/${name.split('/').map(encodeURIComponent).join('/')}`).then(r => json<{ name: string; content: string }>(r))
 
 export const putJobFile = (name: string, content: string) =>
-  fetch(`${BASE}/files/jobs/${name}`, {
+  fetch(`${BASE}/files/jobs/${name.split('/').map(encodeURIComponent).join('/')}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ content }),
   }).then(r => json<{ name: string; saved: boolean }>(r))
 
 export const deleteJobFile = (name: string) =>
-  fetch(`${BASE}/files/jobs/${name}`, { method: 'DELETE' }).then(r =>
+  fetch(`${BASE}/files/jobs/${name.split('/').map(encodeURIComponent).join('/')}`, { method: 'DELETE' }).then(r =>
     json<{ name: string; deleted: boolean }>(r),
   )
 

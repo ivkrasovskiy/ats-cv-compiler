@@ -53,7 +53,7 @@ def test_ingest_pdf_gemini_calls_cli_with_model(client: TestClient):
     codex_cfg = kwargs["codex_config"]
     assert codex_cfg.command == "gemini"
     assert codex_cfg.model == "gemini-2.0-flash"
-    assert codex_cfg.prompt_mode == "arg"
+    assert codex_cfg.prompt_mode == "stdin"
 
 
 def test_ingest_pdf_gemini_default_model(client: TestClient):

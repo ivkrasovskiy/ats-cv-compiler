@@ -160,6 +160,24 @@ def _request_llm_content(config: LLMConfig, prompt: str) -> str:
     return content
 
 
+def _filter_cli_stderr(stderr: str) -> str:
+    """Remove gemini-cli path-scanning noise from stderr.
+
+    gemini-cli scans prompt text for file-path-like tokens and tries to stat
+    them.  When it finds a domain string like ``example.com`` it grabs the rest
+    of the line as the filename, producing an ENAMETOOLONG syscall error that
+    swamps the real API error (e.g. 429 quota exceeded).  Strip those lines so
+    the actionable error is visible.
+    """
+    lines = stderr.splitlines()
+    filtered = [
+        line for line in lines
+        if "ENAMETOOLONG" not in line and not line.startswith("Error stating path")
+    ]
+    clean = "\n".join(filtered).strip()
+    return clean if clean else stderr
+
+
 def _cli_llm_content(config: CodexExecConfig, prompt: str) -> str:
     if config.prompt_mode == "arg":
         cmd = [config.command, *config.args, prompt]
@@ -184,6 +202,7 @@ def _cli_llm_content(config: CodexExecConfig, prompt: str) -> str:
         ) from exc
     if result.returncode != 0:
         stderr = result.stderr.decode("utf-8", errors="replace").strip()
+        stderr = _filter_cli_stderr(stderr)
         raise ValueError(
             f"CLI LLM failed (exit {result.returncode}): {stderr or 'unknown error'}"
         )

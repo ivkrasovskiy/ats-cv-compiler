@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import subprocess
+import tempfile
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -97,6 +98,53 @@ def _get_cli_cmd() -> list[str]:
     return ["claude"]
 
 
+def _run_cli_capture(
+    cli: list[str],
+    prompt: str,
+    *,
+    timeout: int,
+    cwd: Path | None = None,
+) -> str:
+    """Run a CLI with the given prompt, returning the text output.
+
+    Claude CLI writes directly to the TTY when stdout/stderr are pipes, so for
+    claude we use ``claude exec --full-auto --output-last-message <tmpfile>``
+    and read from the file.  For other CLIs (gemini, etc.) stdout capture works.
+    """
+    is_claude = cli == ["claude"]
+    if is_claude:
+        tmp = tempfile.NamedTemporaryFile(delete=False, prefix="repair_cli_", suffix=".txt")
+        last_message_path = Path(tmp.name)
+        tmp.close()
+        cmd = cli + ["exec", "--full-auto", "--output-last-message", str(last_message_path)]
+        try:
+            subprocess.run(
+                cmd,
+                input=prompt,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                cwd=str(cwd) if cwd else None,
+                check=False,
+            )
+            try:
+                return last_message_path.read_text(encoding="utf-8").strip()
+            except FileNotFoundError:
+                return ""
+        finally:
+            last_message_path.unlink(missing_ok=True)
+    else:
+        result = subprocess.run(
+            cli + ["-p", prompt],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            cwd=str(cwd) if cwd else None,
+            check=False,
+        )
+        return result.stdout.strip()
+
+
 def classify_error(entry: ErrorEntry) -> tuple[str, str, str]:
     """Return (error_type, reason, fix_hint) by asking the CLI."""
     prompt = (
@@ -107,14 +155,7 @@ def classify_error(entry: ErrorEntry) -> tuple[str, str, str]:
     )
     cli = _get_cli_cmd()
     try:
-        result = subprocess.run(
-            cli + ["-p", prompt],
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-        output = result.stdout.strip()
-        # Extract JSON from output
+        output = _run_cli_capture(cli, prompt, timeout=30)
         start = output.find("{")
         end = output.rfind("}") + 1
         if start >= 0 and end > start:
@@ -147,14 +188,7 @@ def apply_fix(entry: ErrorEntry, fix_hint: str, project_root: Path) -> str:
     )
     cli = _get_cli_cmd()
     try:
-        result = subprocess.run(
-            cli + ["-p", prompt],
-            capture_output=True,
-            text=True,
-            timeout=120,
-            cwd=str(project_root),
-        )
-        return result.stdout.strip() or result.stderr.strip()
+        return _run_cli_capture(cli, prompt, timeout=120, cwd=project_root)
     except Exception as exc:
         return str(exc)
 
