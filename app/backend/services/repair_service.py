@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import json
 import subprocess
-import tempfile
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -98,6 +97,25 @@ def _get_cli_cmd() -> list[str]:
     return ["claude"]
 
 
+def _extract_stream_json_text(raw: str) -> str:
+    """Extract model text from ``claude -p --output-format stream-json`` stdout."""
+    chunks: list[str] = []
+    for line in raw.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            obj = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if obj.get("type") != "assistant":
+            continue
+        for block in (obj.get("message") or {}).get("content") or []:
+            if block.get("type") == "text" and block.get("text"):
+                chunks.append(block["text"])
+    return "".join(chunks).strip()
+
+
 def _run_cli_capture(
     cli: list[str],
     prompt: str,
@@ -113,26 +131,15 @@ def _run_cli_capture(
     """
     is_claude = cli == ["claude"]
     if is_claude:
-        tmp = tempfile.NamedTemporaryFile(delete=False, prefix="repair_cli_", suffix=".txt")
-        last_message_path = Path(tmp.name)
-        tmp.close()
-        cmd = cli + ["exec", "--full-auto", "--output-last-message", str(last_message_path)]
-        try:
-            subprocess.run(
-                cmd,
-                input=prompt,
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-                cwd=str(cwd) if cwd else None,
-                check=False,
-            )
-            try:
-                return last_message_path.read_text(encoding="utf-8").strip()
-            except FileNotFoundError:
-                return ""
-        finally:
-            last_message_path.unlink(missing_ok=True)
+        result = subprocess.run(
+            cli + ["-p", prompt, "--output-format", "stream-json", "--verbose"],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            cwd=str(cwd) if cwd else None,
+            check=False,
+        )
+        return _extract_stream_json_text(result.stdout)
     else:
         result = subprocess.run(
             cli + ["-p", prompt],
