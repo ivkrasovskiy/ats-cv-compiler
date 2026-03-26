@@ -10,6 +10,7 @@ from __future__ import annotations
 import re
 import subprocess
 import sys
+import tempfile
 import time
 from collections.abc import Sequence
 from pathlib import Path
@@ -268,9 +269,13 @@ class AgentChainProvider:
         Retries up to len(_AGENT_RETRY_DELAYS) extra times on transient failures
         (non-zero exit codes, empty output, timeouts) — covers rate-limit / busy-server
         responses from Claude Code or Gemini CLI free tier.
+
+        Claude CLI writes directly to the TTY when stdout/stderr are pipes, so we use
+        ``claude exec --full-auto --output-last-message <tmpfile>`` and read from the
+        file instead of capturing stdout.  Other CLIs (gemini, etc.) use stdout normally.
         """
         cfg = self._config.codex
-        cmd = [cfg.command, *cfg.args]
+        use_claude_exec = cfg.command == "claude"
         last_exc: ValueError | None = None
 
         for attempt in range(1, len(_AGENT_RETRY_DELAYS) + 2):
@@ -284,43 +289,100 @@ class AgentChainProvider:
                 time.sleep(delay)
 
             try:
-                if cfg.prompt_mode == "arg":
-                    result = subprocess.run(
-                        cmd + [prompt],
-                        capture_output=True,
-                        text=True,
-                        timeout=timeout,
-                        check=False,
-                    )
+                if use_claude_exec:
+                    output, last_exc = self._run_claude_exec(prompt, timeout=timeout)
+                    if last_exc:
+                        continue
+                    return output  # type: ignore[return-value]
                 else:
-                    result = subprocess.run(
-                        cmd,
-                        input=prompt,
-                        capture_output=True,
-                        text=True,
-                        timeout=timeout,
-                        check=False,
-                    )
+                    output, last_exc = self._run_generic_cli(prompt, timeout=timeout)
+                    if last_exc:
+                        continue
+                    return output  # type: ignore[return-value]
             except FileNotFoundError as exc:
-                # Binary not on PATH — not a transient error, fail immediately
                 raise ValueError(f"agent chain failed: command not found ({cfg.command})") from exc
-            except subprocess.TimeoutExpired:
-                last_exc = ValueError(f"agent chain timed out after {timeout}s")
-                continue
-
-            if result.returncode != 0:
-                stderr = (result.stderr or "").strip()
-                last_exc = ValueError(f"agent chain failed: {stderr or 'unknown error'}")
-                continue
-
-            output = (result.stdout or "").strip()
-            if not output:
-                last_exc = ValueError("agent chain returned empty output")
-                continue
-
-            return output
 
         raise last_exc  # type: ignore[misc]
+
+    def _run_claude_exec(
+        self, prompt: str, *, timeout: int
+    ) -> tuple[str | None, ValueError | None]:
+        """Run claude exec with file-based output capture to bypass TTY-write behavior."""
+        cfg = self._config.codex
+        tmp = tempfile.NamedTemporaryFile(delete=False, prefix="chain_agent_", suffix=".txt")
+        last_message_path = Path(tmp.name)
+        tmp.close()
+        cmd = [
+            cfg.command,
+            "exec",
+            "--full-auto",
+            "--output-last-message",
+            str(last_message_path),
+        ]
+        try:
+            result = subprocess.run(
+                cmd,
+                input=prompt,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                check=False,
+            )
+        except subprocess.TimeoutExpired:
+            last_message_path.unlink(missing_ok=True)
+            return None, ValueError(f"agent chain timed out after {timeout}s")
+
+        if result.returncode != 0:
+            last_message_path.unlink(missing_ok=True)
+            stderr = (result.stderr or "").strip()
+            return None, ValueError(f"agent chain failed: {stderr or 'unknown error'}")
+
+        try:
+            output = last_message_path.read_text(encoding="utf-8").strip()
+        except FileNotFoundError:
+            output = ""
+        finally:
+            last_message_path.unlink(missing_ok=True)
+
+        if not output:
+            return None, ValueError("agent chain returned empty output")
+        return output, None
+
+    def _run_generic_cli(
+        self, prompt: str, *, timeout: int
+    ) -> tuple[str | None, ValueError | None]:
+        """Run a non-claude CLI (e.g. gemini) using stdout capture."""
+        cfg = self._config.codex
+        cmd = [cfg.command, *cfg.args]
+        try:
+            if cfg.prompt_mode == "arg":
+                result = subprocess.run(
+                    cmd + [prompt],
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout,
+                    check=False,
+                )
+            else:
+                result = subprocess.run(
+                    cmd,
+                    input=prompt,
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout,
+                    check=False,
+                )
+        except subprocess.TimeoutExpired:
+            return None, ValueError(f"agent chain timed out after {timeout}s")
+
+        if result.returncode != 0:
+            stderr = (result.stderr or "").strip()
+            return None, ValueError(f"agent chain failed: {stderr or 'unknown error'}")
+
+        output = (result.stdout or "").strip()
+        if not output:
+            return None, ValueError("agent chain returned empty output")
+        return output, None
 
     def _warn(self, message: str) -> None:
         self._warnings.append(message)

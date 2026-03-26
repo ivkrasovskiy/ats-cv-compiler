@@ -40,10 +40,10 @@ def resolve_from_env(env_path: Path = Path("config/llm.env")) -> ResolvedProvide
             llm_config=None,
             codex_config=CodexExecConfig(
                 command="gemini",
-                args=("-p",),
+                args=("-p", ""),
                 model=gemini_model,
                 timeout_seconds=300,
-                prompt_mode="arg",
+                prompt_mode="stdin",
                 progress=False,
             ),
         )

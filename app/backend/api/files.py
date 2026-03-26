@@ -80,7 +80,7 @@ def list_job_files() -> list[dict]:
     return file_tree(get_project_root() / "jobs")
 
 
-@router.get("/files/jobs/{name}")
+@router.get("/files/jobs/{name:path}")
 def get_job_file(name: str) -> dict:
     root = get_project_root()
     try:
@@ -92,7 +92,7 @@ def get_job_file(name: str) -> dict:
     return {"name": name, "content": content}
 
 
-@router.put("/files/jobs/{name}")
+@router.put("/files/jobs/{name:path}")
 def put_job_file(name: str, body: Annotated[dict, Body()]) -> dict:
     root = get_project_root()
     try:
@@ -102,7 +102,7 @@ def put_job_file(name: str, body: Annotated[dict, Body()]) -> dict:
     return {"name": name, "saved": True}
 
 
-@router.delete("/files/jobs/{name}")
+@router.delete("/files/jobs/{name:path}")
 def delete_job_file(name: str) -> dict:
     root = get_project_root()
     try:
