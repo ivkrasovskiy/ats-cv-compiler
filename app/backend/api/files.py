@@ -77,7 +77,8 @@ def put_data_file(path: str, body: Annotated[dict, Body()]) -> dict:
 
 @router.get("/files/jobs")
 def list_job_files() -> list[dict]:
-    return file_tree(get_project_root() / "jobs")
+    # Only return flat files (path == name) — nested entries are broken artifacts
+    return [f for f in file_tree(get_project_root() / "jobs") if f["path"] == f["name"]]
 
 
 @router.get("/files/jobs/{name:path}")
