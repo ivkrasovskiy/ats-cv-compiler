@@ -36,12 +36,14 @@ def file_tree(base: Path) -> list[dict]:
     """Recursive sorted list of files under base."""
     if not base.exists():
         return []
-    return [
-        {
-            "path": str(p.relative_to(base)),
-            "name": p.name,
-            "size": p.stat().st_size,
-        }
-        for p in sorted(base.rglob("*"))
-        if p.is_file() and not any(part.startswith(".") for part in p.parts[len(base.parts) :])
-    ]
+    result = []
+    for p in sorted(base.rglob("*")):
+        if p.is_file() and not any(part.startswith(".") for part in p.parts[len(base.parts) :]):
+            st = p.stat()
+            result.append({
+                "path": str(p.relative_to(base)),
+                "name": p.name,
+                "size": st.st_size,
+                "mtime": st.st_mtime,
+            })
+    return result

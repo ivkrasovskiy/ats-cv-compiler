@@ -4,6 +4,7 @@ export interface FileItem {
   path: string
   name: string
   size: number
+  mtime?: number
   company?: string
 }
 
